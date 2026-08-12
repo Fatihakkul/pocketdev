@@ -1,0 +1,603 @@
+/*
+ * Renkler dataviz referans paletinden alındı ve doğrulayıcıdan geçirildi.
+ * Durum renkleri sabit palet: good / warning / critical. Işık yüzeyinde
+ * "warning" 3:1'in altında kaldığı ve good↔critical çifti deuteranopi altında
+ * ΔE 4.1 ölçüldüğü için anlam ikon + etiketle taşınıyor (bkz. Status.tsx).
+ * Süre çubuğu tek hue'lu sequential mavi — işi büyüklük, kimlik değil.
+ */
+:root {
+  color-scheme: light;
+
+  --surface: #fcfcfb;
+  --plane: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --muted: #898781;
+  --gridline: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --accent: #2a78d6;
+  --bar: #86b6ef;
+  --bar-strong: #2a78d6;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --success-text: #006300;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --surface: #1a1a19;
+    --plane: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --gridline: #2c2c2a;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --accent: #3987e5;
+    --bar: #184f95;
+    --bar-strong: #3987e5;
+
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+    --success-text: #0ca30c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--text-primary);
+  font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.dim {
+  color: var(--text-secondary);
+}
+
+.empty {
+  color: var(--muted);
+  margin: 0;
+}
+
+/* ---------- kabuk ---------- */
+
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 216px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.nav-item-active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.main {
+  padding: 24px 28px 56px;
+  max-width: 1080px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.topbar h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.live {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 13px;
+  gap: 7px;
+}
+
+.live-dot {
+  background: var(--muted);
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+
+.live-busy {
+  color: var(--text-secondary);
+}
+
+.live-busy .live-dot {
+  background: var(--warning);
+}
+
+.banner {
+  background: color-mix(in srgb, var(--critical) 12%, transparent);
+  border-radius: 8px;
+  color: var(--critical);
+  margin: 0 0 16px;
+  padding: 10px 14px;
+}
+
+/* ---------- KPI ---------- */
+
+.tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 18px;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+}
+
+.tile-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tile-value {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tile-hint {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 1em;
+}
+
+/* ---------- paneller ---------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+
+.chip {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 6px;
+  padding: 1px 7px;
+}
+
+/* ---------- durum ---------- */
+
+.status {
+  align-items: center;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.status-glyph {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.status-running { color: var(--warning); }
+.status-success { color: var(--success-text); }
+.status-error { color: var(--critical); }
+
+/* ---------- çalışan işler ---------- */
+
+.running {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.running-item {
+  border-top: 1px solid var(--gridline);
+  padding: 10px 0;
+}
+
+.running-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.running-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.running-elapsed {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.running-line {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- geçmiş tablosu ---------- */
+
+.history {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.history th {
+  border-bottom: 1px solid var(--gridline);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px 8px 0;
+  text-align: left;
+}
+
+.history td {
+  border-bottom: 1px solid var(--gridline);
+  padding: 9px 10px 9px 0;
+  vertical-align: top;
+}
+
+.history tr:last-child td {
+  border-bottom: none;
+}
+
+.col-duration {
+  width: 190px;
+}
+
+/* Proje adı ve tarih kısa ve sabit; uzun hata/log metinleri yüzünden tablo
+   bunları sarmasın. */
+.col-tight {
+  white-space: nowrap;
+}
+
+.job-kind {
+  font-weight: 500;
+}
+
+.job-detail,
+.job-error,
+.job-log {
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.job-detail { color: var(--accent); }
+
+/* xcodebuild hataları çok satırlı; satır sonları korunmazsa mesaj tek satıra
+   sıkışıp okunmaz hale geliyor. */
+.job-error {
+  color: var(--critical);
+  white-space: pre-wrap;
+}
+
+.job-log {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.bar-track {
+  background: var(--gridline);
+  border-radius: 3px;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+}
+
+/* Tek hue, açıktan koyuya; uzunluk büyüklüğü taşıyor. Uç 4px yuvarlatılmış. */
+.bar-fill {
+  background: var(--bar-strong);
+  border-radius: 3px;
+  display: block;
+  height: 100%;
+}
+
+/* ---------- komutlar ---------- */
+
+.commands {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.command {
+  align-items: center;
+  border-top: 1px solid var(--gridline);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.command:first-child {
+  border-top: none;
+}
+
+.command-info {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.command-info code {
+  font-weight: 600;
+}
+
+.command-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.input {
+  background: var(--plane);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  min-width: 150px;
+  padding: 6px 10px;
+}
+
+.button {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+}
+
+.result {
+  border-top: 1px solid var(--gridline);
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+.result-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.result-message {
+  background: var(--plane);
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}
+
+/* ---------- ayarlar ---------- */
+
+.env {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.env-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.env-row label {
+  align-items: center;
+  display: flex;
+  flex: 0 0 190px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.env-row .input {
+  flex: 1;
+}
+
+.env-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-bottom: 1px solid var(--border);
+    border-right: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .sidebar nav {
+    flex-direction: row;
+  }
+
+  .sidebar-foot {
+    margin-top: 0;
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .main {
+    padding: 18px 14px 48px;
+  }
+
+  .history .col-duration {
+    width: auto;
+  }
+}
+
+/* ---------- projeler ---------- */
+
+.projects-head {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.projects-head .empty {
+  flex: 1 1 260px;
+}
+
+.project-name {
+  align-items: baseline;
+  display: flex;
+  gap: 2px;
+}
+
+/* Yol uzun olabiliyor; satırı sarmak yerine kısaltıyoruz ki liste hizası bozulmasın. */
+.project-path {
+  direction: rtl;
+  font-size: 12px;
+  max-width: 46ch;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "bağlı" rozeti renkle değil kenarlıkla ayrışıyor: bu bir durum bilgisi,
+   uyarı değil — renk tek başına anlam taşımamalı. */
+.chip-linked {
+  border: 1px solid var(--border);
+  background: transparent;
+}

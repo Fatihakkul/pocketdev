@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+workspace/
+!workspace/.gitkeep
+scratch/
+data/
+*.log
+.DS_Store
+*.tsbuildinfo
