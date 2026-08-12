@@ -60,6 +60,9 @@ BOT_TOKEN=123456:ABC-DEF...
 npm run dev
 ```
 
+(Bu şimdilik izleme kipi. Kalıcı olarak ayakta tutmak istediğinde
+[Sürekli çalışır halde tutmak](#sürekli-çalışır-halde-tutmak) bölümüne bak.)
+
 Konsola tek seferlik bir sahiplenme kodu basılır:
 
 ```
@@ -87,6 +90,45 @@ Sonra [Tailscale yönetim konsolunda](https://login.tailscale.com/admin):
 **5. Kurulumu kontrol et.** Bota `/doctor` yaz. Xcode'u, Claude Code'u,
 CocoaPods'u, imzalama sertifikanı, tüneli ve proje seçiliyse uygulama kimliğini
 ve provisioning profilini denetler; eksik olanı ve çözümünü söyler.
+
+## Sürekli çalışır halde tutmak
+
+`npm run dev` izleme kipi: her dosya değişikliğinde yeniden başlar ve
+terminalini kapatınca ölür. pocketdev'in kendi üzerinde çalışırken istediğin şey
+bu — ama projenin bütün amacı Mac'in başında *değilken* ona ulaşabilmek, o yüzden
+bir süreç yöneticisiyle çalıştır:
+
+```bash
+npm run deploy
+```
+
+Bu komut botu derler, web panelini build eder ve ikisini `ecosystem.config.cjs`
+üzerinden [pm2](https://pm2.keymetrics.io/) ile başlatır (ya da yeniden
+başlatır): `pocketdev` adında tek bir süreç, paneli de dahil,
+`127.0.0.1:4300`'de.
+
+```bash
+npx pm2 logs pocketdev      # logları izle
+npx pm2 restart pocketdev   # .env değişikliğini uygula
+npx pm2 status
+npx pm2 stop pocketdev
+```
+
+`.env`'i düzenlemek — elle ya da panelden — yalnızca dosyayı yeniden yazıyor.
+Hiçbir şey onu yeniden yüklemiyor, yani değişikliğin geçerli olması için yeniden
+başlatmak gerekiyor.
+
+Makine yeniden başladığında da ayakta kalması için pm2'yi bir kez kaydet ve
+süreç listesini sabitle:
+
+```bash
+npx pm2 startup   # sudo ile çalıştırılacak bir komut basar; onu çalıştır
+npx pm2 save
+```
+
+Mac'in kendisinin uyanık olması hâlâ şart: uyuyan makinede hiçbir şey derlenmez.
+Prize takılı tut ve uyumasını engelle (Sistem Ayarları → Kilit Ekranı, ya da
+`caffeinate -s`).
 
 ## Günlük kullanım
 

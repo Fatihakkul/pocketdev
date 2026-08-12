@@ -59,6 +59,9 @@ BOT_TOKEN=123456:ABC-DEF...
 npm run dev
 ```
 
+(That is watch mode, for now. See [Keeping it running](#keeping-it-running) once
+you want it up permanently.)
+
 The console prints a one-time claim code:
 
 ```
@@ -86,6 +89,42 @@ Then, in the [Tailscale admin console](https://login.tailscale.com/admin):
 Code, CocoaPods, your signing certificate, the tunnel, and — if a project is
 selected — the app identity and provisioning profile, and tells you how to fix
 whatever is missing.
+
+## Keeping it running
+
+`npm run dev` is watch mode: it restarts on every file change and dies with your
+terminal. That is what you want while working on pocketdev itself — but the
+whole point is to reach your Mac when you are *not* sitting at it, so run it
+under a process manager instead:
+
+```bash
+npm run deploy
+```
+
+That compiles the bot, builds the web panel, and starts (or restarts) both under
+[pm2](https://pm2.keymetrics.io/) from `ecosystem.config.cjs` — one process named
+`pocketdev`, panel included, on `127.0.0.1:4300`.
+
+```bash
+npx pm2 logs pocketdev      # follow the logs
+npx pm2 restart pocketdev   # apply .env changes
+npx pm2 status
+npx pm2 stop pocketdev
+```
+
+Editing `.env` — by hand or from the panel — only rewrites the file. Nothing
+reloads it, so a restart is required for the change to take effect.
+
+To survive a reboot, register pm2 once and save the process list:
+
+```bash
+npx pm2 startup   # prints a command to run with sudo; run it
+npx pm2 save
+```
+
+The Mac itself still has to be awake: nothing can build on a sleeping machine.
+Keep it plugged in and stop it from sleeping (System Settings → Lock Screen, or
+`caffeinate -s`).
 
 ## Everyday use
 
