@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { EXPO_CONFIG_FILES } from "./expo/config.js";
 
 /**
  * Native projenin JS bağımlılıklarıyla eşitlenip eşitlenmediğini izleyen damga.
@@ -15,11 +16,17 @@ const STAMP_FILE = "prebuild-stamp.json";
 
 /**
  * Native tarafa yansıması gereken dosyalar. Liste proje tipine göre değişiyor:
- * Expo'da bağımlılıklar + config plugin'ler (`app.json`), RN CLI'da bağımlılıklar
+ * Expo'da bağımlılıklar + config plugin'ler, RN CLI'da bağımlılıklar
  * + `ios/Podfile` (config plugin yok, native proje commit'li). Karar mantığı
  * ikisinde de aynı olduğu için yalnızca bu liste adapter'dan geliyor.
+ *
+ * Expo tarafında liste tüm config dosyası adaylarını içeriyor çünkü proje
+ * `app.json` yerine `app.config.ts` de kullanabiliyor. Özet normalde
+ * `expoNativeInputsHash` ile **çözümlenmiş** config üzerinden alınıyor
+ * (bkz. `expo/config.ts`); bu liste damgası olmayan eski projelerde
+ * `staleAgainstPodfileLock`'un mtime karşılaştırması için gerekli.
  */
-export const EXPO_INPUTS = ["package.json", "app.json"];
+export const EXPO_INPUTS = ["package.json", ...EXPO_CONFIG_FILES];
 export const RN_CLI_INPUTS = ["package.json", path.join("ios", "Podfile")];
 
 /** Verilen girdi dosyalarının içerik özeti. */
@@ -81,11 +88,18 @@ export function needsSync(
  * Damgayı eşitleme BİTTİKTEN sonra yazar: eşitleme kendi girdilerini
  * değiştirebiliyor (ör. eksik bağımlılığı package.json'a yazması), ve o durumda
  * önceden alınan özet bir sonraki build'de gereksiz bir eşitleme daha tetiklerdi.
+ *
+ * `hash` dışarıdan veriliyorsa (Expo'da çözümlenmiş config özeti) aynı kural
+ * çağırana geçiyor: özeti eşitlemeden ÖNCE değil, SONRA hesapla.
  */
-export function writeStamp(projectPath: string, inputs: string[]): void {
+export function writeStamp(
+  projectPath: string,
+  inputs: string[],
+  hash = nativeInputsHash(projectPath, inputs)
+): void {
   fs.mkdirSync(path.dirname(stampPath(projectPath)), { recursive: true });
   fs.writeFileSync(
     stampPath(projectPath),
-    JSON.stringify({ hash: nativeInputsHash(projectPath, inputs), at: new Date().toISOString() }, null, 2)
+    JSON.stringify({ hash, at: new Date().toISOString() }, null, 2)
   );
 }

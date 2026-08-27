@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runProcess } from "../../core/processRunner.js";
 import type { DevServer } from "../adapter.js";
+import { readExpoConfig } from "./config.js";
 import { m } from "../../i18n/index.js";
 
 const NGROK_API_URL = "http://localhost:4040/api/tunnels";
@@ -29,17 +30,16 @@ function hasDevClient(projectPath: string): boolean {
 // Deep link şeması olarak `ios.bundleIdentifier` kullanılır. expo-dev-client
 // bunu ayrı bir URL şeması olarak Info.plist'e kaydeder (kontrol:
 // `plutil -extract CFBundleURLTypes json -o - ios/<app>/Info.plist` — orada
-// hem bundleIdentifier hem app.json'daki `scheme` görünür).
+// hem bundleIdentifier hem Expo config'teki `scheme` görünür).
 //
 // Not: dev launcher linki yalnızca host'a göre tanır
 // (EXDevLauncherURLHelper.swift: `url.host == "expo-development-client"`),
 // şemaya bakmaz — yani iki şema da işe yarar. Link açılmıyorsa sebep şema
 // değildir; büyük ihtimalle build Release'dir ve dev launcher hiç çalışmıyordur
 // (bkz. qaBuildRunner.ts'teki açıklama).
-function getIosBundleIdentifier(projectPath: string): string | undefined {
+async function getIosBundleIdentifier(projectPath: string): Promise<string | undefined> {
   try {
-    const appJson = JSON.parse(fs.readFileSync(path.join(projectPath, "app.json"), "utf-8"));
-    return appJson?.expo?.ios?.bundleIdentifier;
+    return (await readExpoConfig(projectPath))?.ios?.bundleIdentifier;
   } catch {
     return undefined;
   }
@@ -98,7 +98,7 @@ export async function start(projectPath: string): Promise<DevServer> {
 
     let connectHint: string;
     if (usesDevClient) {
-      const bundleId = getIosBundleIdentifier(projectPath);
+      const bundleId = await getIosBundleIdentifier(projectPath);
       if (!bundleId) {
         throw new Error(m().runtime.noBundleIdentifierForLink);
       }

@@ -296,11 +296,16 @@ export const en = {
     requestInFlight: "A request is already running, please wait.",
     folderPickerTimedOut: "The folder picker dialog timed out.",
     noBundleIdentifier:
-      "expo.ios.bundleIdentifier is not set in app.json, so no signing profile can be chosen.",
+      "expo.ios.bundleIdentifier is not set in the Expo config, so no signing profile can be chosen.",
     noBundleIdentifierForLink:
-      "expo.ios.bundleIdentifier not found in app.json, so the development build link could not be built.",
+      "expo.ios.bundleIdentifier not found in the Expo config, so the development build link could not be built.",
     noBundleIdentifierBeforeBuild:
-      "expo.ios.bundleIdentifier is not set in app.json — that has to be set first.",
+      "expo.ios.bundleIdentifier is not set in the Expo config — that has to be set first.",
+    expoConfigMissing:
+      "No Expo config found (app.json, app.config.json or app.config.js/ts).",
+    expoConfigNeedsInstall:
+      "This project uses a dynamic Expo config (app.config.js/ts) that could not be evaluated. Run `npm install` first so the local expo CLI can resolve it.",
+    expoConfigUnreadable: "`expo config --json` did not return JSON.",
     metroExited: "Metro exited unexpectedly.",
     previewAlreadyRunning: "A preview is already running. Stop it with /stop first.",
     tunnelUrlTimeout: "Could not get the tunnel URL (timed out).",

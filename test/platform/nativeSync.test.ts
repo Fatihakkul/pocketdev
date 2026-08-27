@@ -41,6 +41,15 @@ describe("nativeInputsHash", () => {
     assert.notEqual(nativeInputsHash(projectPath, EXPO_INPUTS), before);
   });
 
+  test("app.config.js değişince de özet değişir — app.json tek olasılık değil", () => {
+    write("package.json", `{"dependencies":{}}`);
+    write("app.config.js", `module.exports = { expo: { plugins: [] } };`);
+    const before = nativeInputsHash(projectPath, EXPO_INPUTS);
+
+    write("app.config.js", `module.exports = { expo: { plugins: ["expo-notifications"] } };`);
+    assert.notEqual(nativeInputsHash(projectPath, EXPO_INPUTS), before);
+  });
+
   test("app.json değişince de özet değişir (config plugin eklenebilir)", () => {
     write("package.json", `{}`);
     write("app.json", `{"expo":{"plugins":[]}}`);

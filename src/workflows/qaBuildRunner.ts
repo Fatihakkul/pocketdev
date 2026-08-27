@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RunLock } from "../core/runLock.js";
 import { ensureSupported } from "../platform/adapter.js";
+import { readExpoConfig } from "../platform/expo/config.js";
 import { m } from "../i18n/index.js";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -91,12 +92,6 @@ function ensureEasJson(projectPath: string, profile: BuildProfile): void {
   fs.writeFileSync(easJsonPath, JSON.stringify(easJson, null, 2) + "\n");
 }
 
-function readAppJson(projectPath: string): any {
-  const appJsonPath = path.join(projectPath, "app.json");
-  if (!fs.existsSync(appJsonPath)) return undefined;
-  return JSON.parse(fs.readFileSync(appJsonPath, "utf-8"));
-}
-
 async function pollBuild(projectPath: string, buildId: string): Promise<EasBuildInfo> {
   const deadline = Date.now() + BUILD_TIMEOUT_MS;
   while (Date.now() < deadline) {
@@ -116,18 +111,23 @@ export async function startQaBuild(
   profile: BuildProfile = "preview"
 ): Promise<QaBuildResult> {
   return buildLock.run(conversationId, "Zaten bir build sürüyor, lütfen bekle.", async () => {
-    const appJson = readAppJson(projectPath);
-    // /qabuild EAS'e ve app.json'daki Expo alanlarına bağlı; adapter bu komutu
-    // desteklemiyorsa (ör. RN CLI projesi) burada net bir hatayla duruyoruz.
+    // Önce proje tipi: RN CLI projesinde Expo config okumaya çalışmak, asıl
+    // sebebi ("/qabuild bu proje tipinde desteklenmiyor") gizleyen bir config
+    // hatası üretirdi.
     await ensureSupported(projectPath, "qabuild");
 
-    if (!appJson?.expo?.ios?.bundleIdentifier) {
+    // Proje `app.json` yerine `app.config.ts` kullanıyor olabilir; dosya
+    // doğrudan okunmuyor (bkz. platform/expo/config.ts). Okuma hatası da
+    // yutulmuyor — "bundleIdentifier ayarlı değil" demekten açıklayıcı.
+    const expoConfig = await readExpoConfig(projectPath);
+
+    if (!expoConfig?.ios?.bundleIdentifier) {
       throw new Error(m().runtime.noBundleIdentifierBeforeBuild);
     }
 
     ensureEasJson(projectPath, profile);
 
-    if (!appJson?.expo?.extra?.eas?.projectId) {
+    if (!expoConfig?.extra?.eas?.projectId) {
       await execa("eas", ["init", "--force", "--non-interactive"], { cwd: projectPath });
     }
 

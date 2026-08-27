@@ -38,9 +38,28 @@ describe("detectProjectKind", () => {
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
+  test("bağımlılık yoksa app.config.ts varlığı yeter", () => {
+    write("package.json", `{"dependencies":{}}`);
+    write("app.config.ts", `export default { expo: { name: "x" } };`);
+    assert.equal(detectProjectKind(projectPath), "expo");
+  });
+
+  test("app.config.json da Expo sinyali", () => {
+    write("package.json", `{"dependencies":{}}`);
+    write("app.config.json", `{"expo":{"name":"x"}}`);
+    assert.equal(detectProjectKind(projectPath), "expo");
+  });
+
   test("ios/Podfile + react-native varsa react-native-cli", () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
+    assert.equal(detectProjectKind(projectPath), "react-native-cli");
+  });
+
+  test("RN CLI'daki app.json projeyi Expo yapmaz — orada yalnızca uygulama adı var", () => {
+    write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
+    write("ios/Podfile", "platform :ios");
+    write("app.json", `{"name":"MyApp","displayName":"My App"}`);
     assert.equal(detectProjectKind(projectPath), "react-native-cli");
   });
 

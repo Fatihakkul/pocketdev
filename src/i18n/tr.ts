@@ -291,11 +291,16 @@ export const tr: Messages = {
     requestInFlight: "Bir istek zaten işleniyor, lütfen bekleyin.",
     folderPickerTimedOut: "Klasör seçme diyaloğu zaman aşımına uğradı.",
     noBundleIdentifier:
-      "app.json içinde expo.ios.bundleIdentifier ayarlı değil, imzalama profili seçilemez.",
+      "Expo yapılandırmasında expo.ios.bundleIdentifier ayarlı değil, imzalama profili seçilemez.",
     noBundleIdentifierForLink:
-      "app.json içinde expo.ios.bundleIdentifier bulunamadı, development build linki oluşturulamadı.",
+      "Expo yapılandırmasında expo.ios.bundleIdentifier bulunamadı, development build linki oluşturulamadı.",
     noBundleIdentifierBeforeBuild:
-      "app.json içinde expo.ios.bundleIdentifier ayarlı değil, önce bunu ayarlamamız lazım.",
+      "Expo yapılandırmasında expo.ios.bundleIdentifier ayarlı değil, önce bunu ayarlamamız lazım.",
+    expoConfigMissing:
+      "Expo yapılandırması bulunamadı (app.json, app.config.json ya da app.config.js/ts).",
+    expoConfigNeedsInstall:
+      "Bu proje dinamik Expo yapılandırması (app.config.js/ts) kullanıyor ama değerlendirilemedi. Proje-yerel expo CLI'nin çözümleyebilmesi için önce `npm install` çalıştır.",
+    expoConfigUnreadable: "`expo config --json` JSON döndürmedi.",
     metroExited: "Metro beklenmedik şekilde sonlandı.",
     previewAlreadyRunning: "Zaten çalışan bir önizleme var. Önce /stop ile durdur.",
     tunnelUrlTimeout: "Tunnel URL alınamadı (zaman aşımı).",

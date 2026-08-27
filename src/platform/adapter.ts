@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ProgressFn } from "../core/processRunner.js";
+import { EXPO_SPECIFIC_CONFIG_FILES } from "./expo/config.js";
 
 /**
  * Proje tipinden bağımsız yürütme arayüzü.
@@ -90,7 +91,11 @@ const ADAPTERS: AdapterRegistration[] = [
     kind: "expo",
     detect: (projectPath) =>
       hasDependency(projectPath, "expo") ||
-      readJson(path.join(projectPath, "app.json"))?.expo !== undefined,
+      readJson(path.join(projectPath, "app.json"))?.expo !== undefined ||
+      // `app.json` tek olasılık değil: proje `app.config.ts` ya da
+      // `app.config.json` kullanıyor olabilir. Bu dosyalar RN CLI'da bulunmaz,
+      // varlıkları tek başına yeterli sinyal (bkz. expo/config.ts).
+      EXPO_SPECIFIC_CONFIG_FILES.some((name) => fs.existsSync(path.join(projectPath, name))),
     load: async () => (await import("./expo/adapter.js")).expoAdapter,
   },
   {

@@ -3,6 +3,7 @@ import path from "node:path";
 import { runProcess, type ProgressFn } from "../../core/processRunner.js";
 import type { AppInfo, DevServer, ProjectAdapter, SimulatorRun } from "../adapter.js";
 import { EXPO_INPUTS, needsSync, writeStamp } from "../nativeSync.js";
+import { expoNativeInputsHash, readExpoConfig, type ExpoConfig } from "./config.js";
 import * as devServer from "./devServer.js";
 import { m } from "../../i18n/index.js";
 
@@ -24,16 +25,20 @@ const EXPO_MISSING_BUILD = "expo CLI bulunamadı. Bağımlılıkların kurulu ol
 const EXPO_MISSING_PREBUILD = "expo CLI bulunamadı, prebuild çalıştırılamıyor. Önce `npm install`.";
 
 async function readAppInfo(projectPath: string): Promise<AppInfo> {
-  let expo: Record<string, any> = {};
+  let expo: ExpoConfig = {};
+  let configError: Error | undefined;
   try {
-    expo = JSON.parse(fs.readFileSync(path.join(projectPath, "app.json"), "utf-8")).expo ?? {};
-  } catch {
-    // app.json okunamazsa kurulum sayfası jenerik başlıkla çalışmaya devam eder
+    expo = await readExpoConfig(projectPath);
+  } catch (error) {
+    // Config okunamazsa kurulum sayfası jenerik başlıkla çalışmaya devam eder.
+    configError = error as Error;
   }
   const icon = typeof expo.icon === "string" ? expo.icon : "";
   const bundleId = expo.ios?.bundleIdentifier;
   if (typeof bundleId !== "string" || bundleId.length === 0) {
-    throw new Error(m().runtime.noBundleIdentifier);
+    // Config hiç okunamadıysa asıl sebep o; "bundleIdentifier ayarlı değil"
+    // demek kullanıcıyı var olmayan bir alanı aramaya gönderir.
+    throw configError ?? new Error(m().runtime.noBundleIdentifier);
   }
   return {
     appName: typeof expo.name === "string" ? expo.name : path.basename(projectPath),
@@ -54,7 +59,18 @@ async function syncNative(
   projectPath: string,
   onProgress?: (lastLine?: string) => void
 ): Promise<boolean> {
-  if (!needsSync(projectPath, EXPO_INPUTS)) return false;
+  // Özet ham dosyalardan değil çözümlenmiş config'ten alınıyor: plugin listesi
+  // `app.config.ts` içinde hesaplanıyor olabilir, o zaman dosyanın kendisi hiç
+  // değişmeden native taraf değişir. Config okunamıyorsa (bağımlılıklar kurulu
+  // değil) dosya tabanlı özete düşüyoruz.
+  let currentHash: string | undefined;
+  try {
+    currentHash = await expoNativeInputsHash(projectPath);
+  } catch {
+    currentHash = undefined;
+  }
+
+  if (!needsSync(projectPath, EXPO_INPUTS, currentHash)) return false;
 
   // `--clean` KULLANMIYORUZ: o, ios/ klasörünü silip sıfırdan üretiyor ve
   // projede elle yapılmış native düzenleme varsa onu da götürüyor. Üzerine
@@ -73,7 +89,15 @@ async function syncNative(
   });
 
   await prebuild.finished("Prebuild");
-  writeStamp(projectPath, EXPO_INPUTS);
+  // Özet prebuild'den SONRA yeniden hesaplanıyor (bkz. writeStamp yorumu):
+  // prebuild kendi girdilerini değiştirebiliyor.
+  let stampHash: string | undefined;
+  try {
+    stampHash = await expoNativeInputsHash(projectPath);
+  } catch {
+    stampHash = undefined;
+  }
+  writeStamp(projectPath, EXPO_INPUTS, stampHash);
   return true;
 }
 
