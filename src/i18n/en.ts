@@ -170,6 +170,8 @@ export const en = {
 
   chat: {
     locked: "🔒 Send /newchat first, then we can talk.",
+    historyReset:
+      "⚠️ The previous conversation history could not be resumed, so this answer starts from scratch — it does not know what we discussed before.",
     sandboxVerifying: "⏳ The sandbox check is still running, try again in a few seconds.",
     sandboxFailed: (detail: string): string =>
       `🚫 The sandbox could not be verified, so no Claude session will start.\n${detail}`,
@@ -306,6 +308,8 @@ export const en = {
     expoConfigNeedsInstall:
       "This project uses a dynamic Expo config (app.config.js/ts) that could not be evaluated. Run `npm install` first so the local expo CLI can resolve it.",
     expoConfigUnreadable: "`expo config --json` did not return JSON.",
+    devClientMissingForDebug:
+      "This project does not depend on expo-dev-client, so a Debug build ships without a dev launcher and /preview cannot point it at a tunnel. Run `npx expo install expo-dev-client` in the project, then build again.",
     metroExited: "Metro exited unexpectedly.",
     previewAlreadyRunning: "A preview is already running. Stop it with /stop first.",
     tunnelUrlTimeout: "Could not get the tunnel URL (timed out).",

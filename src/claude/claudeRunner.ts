@@ -95,6 +95,12 @@ function pickPrimaryModel(modelUsage: ClaudeJsonResult["modelUsage"]): string | 
 export interface ClaudeRunResult {
   text: string;
   isError: boolean;
+  /**
+   * Bu cevap, konuşma geçmişi kaybedildikten sonra SIFIRDAN üretildiyse true.
+   * Kullanıcıya söylenmesi şart: sessiz amnezi, farkında olmadan yanlış
+   * varsayımlarla devam etmek demek.
+   */
+  historyReset?: boolean;
 }
 
 // Only one claude invocation per conversation at a time, to avoid session/state races.
@@ -104,11 +110,26 @@ export function isBusy(conversationId: number): boolean {
   return busyConversations.has(conversationId);
 }
 
+/**
+ * `--resume` gerçekten bayat bir oturum yüzünden mi patladı?
+ *
+ * Zaman aşımı ve sinyalle sonlandırma oturumun bozuk olduğunu GÖSTERMEZ; koşu
+ * yarıda kalmıştır, o kadar. Bu ayrım olmadan her deploy (süreç yeniden
+ * başlatılırken çocuk süreç öldürülüyor) ve 10 dakikayı aşan her uzun görev
+ * kullanıcının konuşma geçmişini siliyordu.
+ */
+export function looksLikeStaleSession(error: unknown): boolean {
+  const e = error as { timedOut?: boolean; isTerminated?: boolean; signal?: string };
+  return !e?.timedOut && !e?.isTerminated && !e?.signal;
+}
+
 export async function run(
   conversationId: number,
   projectPath: string,
   projectName: string,
-  prompt: string
+  prompt: string,
+  /** İç kullanım: oturum sıfırlandıktan sonraki tekrar denemede true. */
+  afterHistoryReset = false
 ): Promise<ClaudeRunResult> {
   if (busyConversations.has(conversationId)) {
     throw new Error(m().runtime.requestInFlight);
@@ -171,13 +192,22 @@ export async function run(
       isError: parsed.is_error,
     };
   } catch (error) {
-    // A stale/expired session id makes --resume fail; retry once without it.
     const sessionId = state.getSessionId(conversationId, projectName);
-    if (sessionId) {
+
+    // Hatayı HER durumda logla. Eskiden sessizce yutuluyordu ve "Claude neden
+    // geçmişi unuttu?" sorusu geriye dönük olarak cevaplanamıyordu.
+    console.error(
+      `[claude] run failed (project=${projectName}, resumed=${Boolean(sessionId)}): ${(error as Error).message}`
+    );
+
+    // Bayat oturum: sil, bir kez sıfırdan dene — ama kullanıcıya söyle.
+    if (sessionId && !afterHistoryReset && looksLikeStaleSession(error)) {
       state.clearSessionId(conversationId, projectName);
       busyConversations.delete(conversationId);
-      return run(conversationId, projectPath, projectName, prompt);
+      const retried = await run(conversationId, projectPath, projectName, prompt, true);
+      return { ...retried, historyReset: true };
     }
+
     throw error;
   } finally {
     busyConversations.delete(conversationId);

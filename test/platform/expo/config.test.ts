@@ -8,6 +8,7 @@ import {
   EXPO_CONFIG_FILES,
   EXPO_SPECIFIC_CONFIG_FILES,
   expoNativeInputsHash,
+  hasDevClient,
   hasDynamicConfig,
   readExpoConfig,
 } from "../../../src/platform/expo/config.js";
@@ -162,6 +163,32 @@ describe("EXPO_SPECIFIC_CONFIG_FILES", () => {
     assert.equal(hasDynamicConfig(projectPath), false);
     write("app.config.js", `module.exports = {};`);
     assert.equal(hasDynamicConfig(projectPath), true);
+  });
+});
+
+describe("hasDevClient", () => {
+  // Bu bayrak iki kararı sürüyor: /preview'ın dev launcher deep link'i mi Expo
+  // Go linki mi üreteceği, ve /otabuild dev'in kullanılabilir bir Debug build
+  // üretip üretemeyeceği. Yanlış olduğunda ikisi de sessizce uyumsuz kalıyor.
+  test("a package in dependencies counts", () => {
+    write("package.json", `{"dependencies":{"expo-dev-client":"~5.0.0"}}`);
+    assert.equal(hasDevClient(projectPath), true);
+  });
+
+  test("one in devDependencies counts too", () => {
+    write("package.json", `{"devDependencies":{"expo-dev-client":"~5.0.0"}}`);
+    assert.equal(hasDevClient(projectPath), true);
+  });
+
+  test("false when the package is absent", () => {
+    write("package.json", `{"dependencies":{"expo":"~57.0.0"}}`);
+    assert.equal(hasDevClient(projectPath), false);
+  });
+
+  test("a missing or broken package.json does not crash it", () => {
+    assert.equal(hasDevClient(projectPath), false);
+    write("package.json", "bu json degil");
+    assert.equal(hasDevClient(projectPath), false);
   });
 });
 

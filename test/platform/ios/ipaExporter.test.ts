@@ -25,6 +25,15 @@ const PROFILE: InstalledProfile = {
 
 const MANUAL: Signing = { mode: "manual", profile: PROFILE };
 
+const XCODE_PROFILE: InstalledProfile = {
+  uuid: "99999999-8888-7777-6666-555555555555",
+  name: "iOS Team Ad Hoc Provisioning Profile: com.example.app",
+  teamId: "ABCDE12345",
+  isXcodeManaged: true,
+};
+
+const XCODE_MANAGED: Signing = { mode: "xcode-managed", profile: XCODE_PROFILE };
+
 const CREDENTIALS = {
   keyId: "ABC123XYZ0",
   issuerId: "11111111-2222-3333-4444-555555555555",
@@ -97,6 +106,22 @@ describe("buildExportOptionsPlist — automatic signing", () => {
   });
 });
 
+describe("buildExportOptionsPlist — Xcode-managed profile", () => {
+  const managedPlist = buildExportOptionsPlist("https://mac.tailnet.ts.net", "com.example.app", XCODE_MANAGED);
+
+  test("the signing style is automatic, not manual", () => {
+    assert.match(managedPlist, /<key>signingStyle<\/key>\s*<string>automatic<\/string>/);
+  });
+
+  test("the profile is not pinned by name — export rejects it the same way", () => {
+    assert.doesNotMatch(managedPlist, /provisioningProfiles/);
+  });
+
+  test("the team still comes from the profile", () => {
+    assert.match(managedPlist, /<key>teamID<\/key>\s*<string>ABCDE12345<\/string>/);
+  });
+});
+
 describe("selectProfile", () => {
   const now = new Date("2026-08-12T00:00:00Z");
   const at = (iso: string): Date => new Date(iso);
@@ -134,6 +159,36 @@ describe("selectProfile", () => {
       now
     );
     assert.equal(selected?.name, "valid");
+  });
+
+  test("a manually managed profile wins over an Xcode-managed one", () => {
+    // Xcode-managed profil daha taze olsa bile: manuel imzalama, Xcode'un
+    // wildcard development profilini seçip aps-environment hatası vermesini
+    // engelleyen tercih edilen yol.
+    const selected = selectProfile(
+      [
+        { ...XCODE_PROFILE, expiresAt: at("2027-12-01T00:00:00Z") },
+        { ...PROFILE, expiresAt: at("2027-01-01T00:00:00Z") },
+      ],
+      now
+    );
+    assert.equal(selected?.uuid, PROFILE.uuid);
+  });
+
+  test("an Xcode-managed profile is still used when it is the only candidate", () => {
+    const selected = selectProfile([{ ...XCODE_PROFILE, expiresAt: at("2027-12-01T00:00:00Z") }], now);
+    assert.equal(selected?.uuid, XCODE_PROFILE.uuid);
+  });
+
+  test("an expired manual profile does not shadow a valid Xcode-managed one", () => {
+    const selected = selectProfile(
+      [
+        { ...PROFILE, expiresAt: at("2025-01-01T00:00:00Z") },
+        { ...XCODE_PROFILE, expiresAt: at("2027-12-01T00:00:00Z") },
+      ],
+      now
+    );
+    assert.equal(selected?.uuid, XCODE_PROFILE.uuid);
   });
 
   test("a profile with an unreadable date is not filtered out", () => {
@@ -195,5 +250,20 @@ describe("archiveSigningArgs", () => {
     assert.ok(args.includes("-allowProvisioningUpdates"));
     assert.ok(!args.some((arg) => arg.startsWith("CODE_SIGN_IDENTITY=")));
     assert.ok(!args.some((arg) => arg.startsWith("PROVISIONING_PROFILE_SPECIFIER=")));
+  });
+
+  test("an Xcode-managed profile is never pinned — that is the exit 65", () => {
+    // xcodebuild: "is Xcode managed, but signing settings require a manually
+    // managed profile". Pinlemek ikinci /otabuild'ı kalıcı olarak öldürüyordu.
+    const args = archiveSigningArgs(XCODE_MANAGED, "DEADBEEF");
+    assert.ok(args.includes("CODE_SIGN_STYLE=Automatic"));
+    assert.ok(args.includes(`DEVELOPMENT_TEAM=${XCODE_PROFILE.teamId}`));
+    assert.ok(!args.some((arg) => arg.startsWith("PROVISIONING_PROFILE_SPECIFIER=")));
+    assert.ok(!args.some((arg) => arg.startsWith("CODE_SIGN_IDENTITY=")));
+  });
+
+  test("an Xcode-managed profile needs no portal round trip — it already exists", () => {
+    // App Store Connect anahtarı tanımlı olmasa da bu yol çalışmalı.
+    assert.ok(!archiveSigningArgs(XCODE_MANAGED, undefined).includes("-allowProvisioningUpdates"));
   });
 });

@@ -27,20 +27,30 @@ export interface ExportedIpa {
 /**
  * Bu build'in nasıl imzalanacağı.
  *
- * `manual` normal yol ve varsayılan: kurulu ad-hoc profil doğrudan gösteriliyor.
+ * `manual` normal yol: ELLE yönetilen bir ad-hoc profil doğrudan gösteriliyor.
  * Neden otomatik imzalamaya güvenilmediği `archive()` içinde yazılı.
+ *
+ * `xcode-managed` kurulu profili Xcode'un kendisi ürettiğinde kullanılıyor.
+ * Böyle bir profil manuel modda PINLENEMEZ — `xcodebuild` "is Xcode managed,
+ * but signing settings require a manually managed profile" deyip exit 65
+ * veriyor. Profil zaten var, o yüzden portala da gitmiyoruz: yalnızca takımı
+ * verip stili otomatiğe alıyoruz.
  *
  * `automatic` yalnızca **profil hiç yokken** ve App Store Connect anahtarı
  * tanımlıyken devreye giriyor — tek amacı eksik profili Apple'a ürettirmek.
- * Profil bir kez oluştuktan sonra diske kurulduğu için sonraki build'ler yine
- * `manual` yolu kullanıyor. Yani bu bir kurulum kolaylığı, kalıcı bir mod değil.
+ *
+ * Bu üçlü, `/otabuild`'ın her bundle id için yalnızca BİR kez çalışmasına yol
+ * açan hatayı kapatıyor: ilk koşu `automatic` ile Xcode-managed bir profil
+ * üretiyordu, sonraki koşular o profili elle yönetiliyor sanıp manuel modda
+ * pinliyor ve kalıcı olarak patlıyordu.
  */
 export type Signing =
   | { mode: "manual"; profile: InstalledProfile }
+  | { mode: "xcode-managed"; profile: InstalledProfile }
   | { mode: "automatic"; teamId: string; credentials: AppStoreConnectCredentials };
 
 export function signingTeamId(signing: Signing): string {
-  return signing.mode === "manual" ? signing.profile.teamId : signing.teamId;
+  return signing.mode === "automatic" ? signing.teamId : signing.profile.teamId;
 }
 
 /**
@@ -72,6 +82,13 @@ export function archiveSigningArgs(signing: Signing, identity: string | undefine
       "CODE_SIGN_STYLE=Automatic",
       ...authenticationArgs(signing.credentials),
     ];
+  }
+
+  if (signing.mode === "xcode-managed") {
+    // Profil diskte duruyor, eksik olan bir şey yok: portal bayrakları
+    // gereksiz ve App Store Connect anahtarı olmadan da çalışmalı. Takımı
+    // vermek şart, Expo prebuild projeye yazmıyor (aşağıdaki nota bak).
+    return [`DEVELOPMENT_TEAM=${signing.profile.teamId}`, "CODE_SIGN_STYLE=Automatic"];
   }
 
   return [
@@ -240,6 +257,12 @@ export interface InstalledProfile {
   teamId: string;
   /** Profilin son geçerlilik tarihi; seçim ve süresi dolmuşları eleme için. */
   expiresAt?: Date;
+  /**
+   * Profili Xcode mi üretti (`IsXcodeManaged`)? Böyle bir profil manuel modda
+   * pinlenemez; imzalama stili otomatik olmak zorunda. Alan yoksa profil elle
+   * yönetiliyor demektir.
+   */
+  isXcodeManaged?: boolean;
 }
 
 /**
@@ -259,9 +282,15 @@ export interface InstalledProfile {
  */
 export function selectProfile(candidates: InstalledProfile[], now: Date): InstalledProfile | undefined {
   const usable = candidates.filter((profile) => !profile.expiresAt || profile.expiresAt > now);
-  return [...usable].sort(
-    (a, b) => (b.expiresAt?.getTime() ?? Infinity) - (a.expiresAt?.getTime() ?? Infinity)
-  )[0];
+  const byExpiry = (a: InstalledProfile, b: InstalledProfile) =>
+    (b.expiresAt?.getTime() ?? Infinity) - (a.expiresAt?.getTime() ?? Infinity);
+
+  // Elle yönetilen profil varsa o kazanıyor: manuel imzalama, Xcode'un wildcard
+  // development profilini seçip `aps-environment` hatası vermesini engellediği
+  // için tercih edilen yol (bkz. archiveSigningArgs). Xcode-managed profil
+  // yalnızca başka aday yokken kullanılıyor ve o zaman mod da otomatiğe dönüyor.
+  const manual = usable.filter((profile) => !profile.isXcodeManaged);
+  return [...(manual.length ? manual : usable)].sort(byExpiry)[0];
 }
 
 /**
@@ -329,6 +358,9 @@ export async function findAdHocProfile(bundleId: string): Promise<InstalledProfi
     const name = await extractKey(xml, "Name", "raw");
     const entitlementsJson = await extractKey(xml, "Entitlements", "json");
     const expiresRaw = await extractKey(xml, "ExpirationDate", "raw");
+    // Anahtar yalnızca Xcode'un ürettiği profillerde bulunuyor; yokluğu "elle
+    // yönetiliyor" demek.
+    const managedRaw = await extractKey(xml, "IsXcodeManaged", "raw");
     if (!uuid || !name || !entitlementsJson) continue;
 
     const expiresAt = expiresRaw ? new Date(expiresRaw) : undefined;
@@ -352,6 +384,7 @@ export async function findAdHocProfile(bundleId: string): Promise<InstalledProfi
       name,
       teamId,
       expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : undefined,
+      isXcodeManaged: managedRaw === "true",
     });
   }
 
@@ -397,7 +430,13 @@ export async function findDistributionTeamIds(): Promise<string[]> {
  */
 export async function resolveSigning(bundleId: string): Promise<Signing> {
   try {
-    return { mode: "manual", profile: await findAdHocProfile(bundleId) };
+    const profile = await findAdHocProfile(bundleId);
+    // Xcode'un ürettiği profil manuel modda pinlenemez; onu otomatik stille
+    // kullanıyoruz. Aksi hâlde ilk `/otabuild` profili üretiyor ve ikincisi
+    // kalıcı olarak exit 65 veriyordu.
+    return profile.isXcodeManaged
+      ? { mode: "xcode-managed", profile }
+      : { mode: "manual", profile };
   } catch (missingProfile) {
     const credentials = config.appStoreConnect;
     if (!credentials) throw missingProfile;
@@ -424,6 +463,8 @@ export async function resolveSigning(bundleId: string): Promise<Signing> {
 export function buildExportOptionsPlist(baseUrl: string, bundleId: string, signing: Signing): string {
   // Otomatik modda profil ve sertifika seçimini Xcode yapıyor: ikisi de henüz
   // var olmayabilir, zaten bu modun sebebi onları ürettirmek.
+  // `xcode-managed` de otomatik tarafa düşüyor: profili adıyla pinlemek export
+  // adımında da aynı "Xcode managed" hatasını veriyor.
   const signingBlock =
     signing.mode === "manual"
       ? `  <key>signingStyle</key>

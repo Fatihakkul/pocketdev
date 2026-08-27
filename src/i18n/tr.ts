@@ -165,6 +165,8 @@ export const tr: Messages = {
 
   chat: {
     locked: "🔒 Önce /newchat gönder, sonra konuşabiliriz.",
+    historyReset:
+      "⚠️ Önceki konuşma geçmişi devam ettirilemedi, bu cevap sıfırdan üretildi — daha önce konuştuklarımızı bilmiyor.",
     sandboxVerifying: "⏳ Sandbox doğrulaması sürüyor, birkaç saniye sonra tekrar dene.",
     sandboxFailed: (detail: string): string =>
       `🚫 Sandbox doğrulanamadı, Claude oturumu açılmıyor.\n${detail}`,
@@ -301,6 +303,8 @@ export const tr: Messages = {
     expoConfigNeedsInstall:
       "Bu proje dinamik Expo yapılandırması (app.config.js/ts) kullanıyor ama değerlendirilemedi. Proje-yerel expo CLI'nin çözümleyebilmesi için önce `npm install` çalıştır.",
     expoConfigUnreadable: "`expo config --json` JSON döndürmedi.",
+    devClientMissingForDebug:
+      "Bu proje expo-dev-client bağımlılığı içermiyor; Debug build dev launcher olmadan çıkar ve /preview onu tünele yönlendiremez. Projede `npx expo install expo-dev-client` çalıştırıp yeniden build al.",
     metroExited: "Metro beklenmedik şekilde sonlandı.",
     previewAlreadyRunning: "Zaten çalışan bir önizleme var. Önce /stop ile durdur.",
     tunnelUrlTimeout: "Tunnel URL alınamadı (zaman aşımı).",

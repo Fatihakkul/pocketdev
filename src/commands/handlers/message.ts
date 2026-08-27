@@ -38,6 +38,11 @@ export async function handleMessage(ctx: CommandContext): Promise<void> {
       await ctx.respond.text(`⚠️ ${result.text}`);
       return;
     }
+    // Geçmiş kaybedildiyse önce onu söyle: cevabın kendisi akıcı geldiği için
+    // kullanıcı aksi hâlde amnezi olduğunu fark etmiyor.
+    if (result.historyReset) {
+      await ctx.respond.text(m().chat.historyReset);
+    }
     await ctx.respond.text(result.text);
   } catch (error) {
     await progress.remove();

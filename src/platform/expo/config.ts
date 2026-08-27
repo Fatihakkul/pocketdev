@@ -183,6 +183,24 @@ export async function expoNativeInputsHash(projectPath: string): Promise<string>
   return hash.digest("hex");
 }
 
+/**
+ * Projede `expo-dev-client` bağımlılık olarak var mı?
+ *
+ * İki karar buna bağlı ve ikisi de yanlış olduğunda sessizce kırılıyor:
+ * `/preview` dev launcher deep link'i mi yoksa Expo Go linki mi üreteceğine,
+ * `/otabuild dev` ise ürettiği Debug build'in tünele yönlendirilebilir olup
+ * olmadığına. Paket yoksa Debug build'de dev launcher hiç bulunmuyor ve
+ * uygulama içine gömülü Metro adresine bakıyor.
+ */
+export function hasDevClient(projectPath: string): boolean {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(projectPath, "package.json"), "utf-8"));
+    return Boolean(pkg?.dependencies?.["expo-dev-client"] ?? pkg?.devDependencies?.["expo-dev-client"]);
+  } catch {
+    return false;
+  }
+}
+
 /** Testler için; süreç ömrü boyunca tutulan önbelleği temizler. */
 export function clearExpoConfigCache(): void {
   cache.clear();

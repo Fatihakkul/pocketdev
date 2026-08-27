@@ -3,6 +3,8 @@ import path from "node:path";
 import * as ipaExporter from "../platform/ios/ipaExporter.js";
 import * as otaServer from "../platform/ios/otaServer.js";
 import { getAdapter } from "../platform/adapter.js";
+import { hasDevClient } from "../platform/expo/config.js";
+import { m } from "../i18n/index.js";
 import { RunLock, SessionStore } from "../core/runLock.js";
 
 /** Tunnel'ı sonsuza kadar açık bırakmamak için üst sınır. */
@@ -54,6 +56,15 @@ export async function startOtaBuild(
   return buildLock.run(conversationId, "Zaten bir OTA build sürüyor, lütfen bekle.", async () => {
     const startedAt = Date.now();
     const adapter = await getAdapter(projectPath);
+
+    // En başta: dev launcher'sız bir Debug build /preview'a bağlanamaz, yani
+    // komut vaat ettiği şeyi yapamaz. Aynı gerekçe imzalama profili ve tünel
+    // ön kontrolleriyle aynı — 20 dakikalık archive'ı bekleyip sonunda
+    // kullanılamaz bir build teslim etmek anlamsız.
+    if (configuration === "Debug" && adapter.kind === "expo" && !hasDevClient(projectPath)) {
+      throw new Error(m().runtime.devClientMissingForDebug);
+    }
+
     const info = await adapter.readAppInfo(projectPath);
     const serveDir = path.join(projectPath, "build", "ota");
 

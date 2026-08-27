@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runProcess } from "../../core/processRunner.js";
 import type { DevServer } from "../adapter.js";
-import { readExpoConfig } from "./config.js";
+import { hasDevClient, readExpoConfig } from "./config.js";
 import { m } from "../../i18n/index.js";
 
 const NGROK_API_URL = "http://localhost:4040/api/tunnels";
@@ -16,15 +16,6 @@ interface NgrokTunnel {
 
 interface NgrokTunnelsResponse {
   tunnels: NgrokTunnel[];
-}
-
-function hasDevClient(projectPath: string): boolean {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(projectPath, "package.json"), "utf-8"));
-    return Boolean(pkg?.dependencies?.["expo-dev-client"]);
-  } catch {
-    return false;
-  }
 }
 
 // Deep link şeması olarak `ios.bundleIdentifier` kullanılır. expo-dev-client
