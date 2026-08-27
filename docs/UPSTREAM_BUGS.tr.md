@@ -1,28 +1,27 @@
-# Upstream bugs
+# Upstream hatalar
 
-*[Türkçe](UPSTREAM_BUGS.tr.md)*
+*[English](UPSTREAM_BUGS.md)*
 
-Bugs found in dependencies while building this project — **none of them are in
-our own code**. For each one: how it was found, the evidence, the workaround,
-and whether it has been reported.
+Bu projeyi kurarken bağımlılıklarda bulunan, **bizim kodumuzda olmayan** hatalar.
+Her biri için: nasıl bulundu, kanıt, geçici çözüm, ve bildirildi mi.
 
 ---
 
-## 1. React Native 0.83.1 — `packagerScheme` never reaches the bundle URL
+## 1. React Native 0.83.1 — `packagerScheme` bundle URL'ine hiç ulaşmıyor
 
-**Status:** not reported (2026-08-12)
-**Impact:** the iOS dev client cannot reach Metro over https. That makes Metro
-unusable behind an HTTPS-only tunnel (Tailscale Funnel, cloudflared) — which
-means remote development as a whole.
+**Durum:** bildirilmedi (2026-08-12)
+**Etki:** iOS dev client'ı https üzerinden Metro'ya bağlanamıyor. Bu, HTTPS-only
+bir tünelin (Tailscale Funnel, cloudflared) arkasındaki Metro'yu kullanılamaz
+kılıyor — yani uzaktan geliştirmenin tamamını.
 
-### The bug
+### Hata
 
-`React/Base/RCTBundleURLProvider.mm`, the 8-argument overload:
+`React/Base/RCTBundleURLProvider.mm`, 8 argümanlı aşırı yükleme:
 
 ```objc
 + (NSURL *)jsBundleURLForBundleRoot:(NSString *)bundleRoot
                        packagerHost:(NSString *)packagerHost
-                     packagerScheme:(NSString *)scheme        // ← taken as a parameter
+                     packagerScheme:(NSString *)scheme        // ← parametre alınıyor
                           enableDev:(BOOL)enableDev
                  enableMinification:(BOOL)enableMinification
                     inlineSourceMap:(BOOL)inlineSourceMap
@@ -31,7 +30,7 @@ means remote development as a whole.
 {
   return [self jsBundleURLForBundleRoot:bundleRoot
                            packagerHost:packagerHost
-                         packagerScheme:nil                   // ← and then ignored
+                         packagerScheme:nil                   // ← ve yok sayılıyor
                               enableDev:enableDev
                      enableMinification:enableMinification
                         inlineSourceMap:inlineSourceMap
@@ -41,8 +40,8 @@ means remote development as a whole.
 }
 ```
 
-The `scheme` argument is accepted and never used; `nil` is passed on instead.
-Further down, `serverRootWithHostPort` turns a `nil` scheme into `"http"`:
+`scheme` parametresi alınıp kullanılmıyor; yerine `nil` geçiliyor. Aşağıda
+`serverRootWithHostPort` `nil` şemayı `"http"`ye çeviriyor:
 
 ```objc
 static NSURL *serverRootWithHostPort(NSString *hostPort, NSString *scheme)
@@ -54,8 +53,7 @@ static NSURL *serverRootWithHostPort(NSString *hostPort, NSString *scheme)
 }
 ```
 
-Because the instance method goes through exactly that path, the setting never
-takes effect:
+Instance metodu tam bu yolu kullandığı için ayar hiçbir zaman etkili olmuyor:
 
 ```objc
 - (NSURL *)jsBundleURLForBundleRoot:(NSString *)bundleRoot fallbackURLProvider:(...)
@@ -63,34 +61,34 @@ takes effect:
   ...
   return [RCTBundleURLProvider jsBundleURLForBundleRoot:bundleRoot
                                            packagerHost:packagerServerHostPort
-                                         packagerScheme:[self packagerScheme]   // ← for nothing
+                                         packagerScheme:[self packagerScheme]   // ← boşuna
                                               ...];
 }
 ```
 
-### Evidence
+### Kanıt
 
-On device (iPhone 11, iOS 18.6.2), with a temporary `NSLog` placed inside
-`AppDelegate.bundleURL()`:
+Cihazda (iPhone 11, iOS 18.6.2), `AppDelegate.bundleURL()` içine konan geçici
+`NSLog` ile:
 
 ```
 [bridge] jsLocation=<host>.ts.net:443  scheme=https  url=http://<host>.ts.net:443/index.bundle?...
 ```
 
-`packagerScheme` reads as **https**, and the URL produced is still **http**.
+`packagerScheme` **https** olarak okunuyor, üretilen URL yine de **http**.
 
-The same `packagerScheme` value works correctly elsewhere, so the setting itself
-is sound — only this URL construction is broken:
+Aynı `packagerScheme` değeri başka yerlerde doğru çalışıyor — yani ayarın
+kendisi sağlam, kırık olan yalnızca bu URL kurulumu:
 
-- `packagerServerHostPort` → the `isPackagerRunning:location scheme:@"https"`
-  call succeeded over https (otherwise `location` would be nil and the app would
-  fall back to the embedded bundle)
-- `RCTPackagerConnection` reads the websocket scheme from the same place
+- `packagerServerHostPort` → `isPackagerRunning:location scheme:@"https"`
+  çağrısı https ile başarılı oldu (aksi hâlde `location` nil olur, uygulama
+  gömülü bundle'a düşerdi)
+- `RCTPackagerConnection` websocket şemasını yine buradan okuyor
 
-### Workaround
+### Geçici çözüm
 
-Call the 9-argument version (the one with `additionalOptions:`) directly — it
-forwards the scheme as given:
+9 argümanlı sürümü (`additionalOptions:` alanı) doğrudan çağırmak — o, şemayı
+olduğu gibi aktarıyor:
 
 ```swift
 RCTBundleURLProvider.jsBundleURL(
@@ -106,13 +104,13 @@ RCTBundleURLProvider.jsBundleURL(
 )
 ```
 
-Full context and the complete `AppDelegate` block: `V2.md` → "Doğrulanmamış
-noktalar" → item 1 (Turkish).
+Tam bağlam ve `AppDelegate` bloğunun tamamı: `V2.md` → "Doğrulanmamış
+noktalar" → 1. madde.
 
-### Suggested fix
+### Önerilen düzeltme
 
-The 8-argument overload should forward the `scheme` it receives instead of
-`packagerScheme:nil`. One line:
+8 argümanlı aşırı yükleme `packagerScheme:nil` yerine aldığı `scheme`'i
+geçirmeli. Tek satır:
 
 ```diff
    return [self jsBundleURLForBundleRoot:bundleRoot
@@ -122,7 +120,7 @@ The 8-argument overload should forward the `scheme` it receives instead of
                                enableDev:enableDev
 ```
 
-### Draft report
+### Bildirim taslağı (İngilizce)
 
 > **`RCTBundleURLProvider` drops `packagerScheme`, forcing `http://` for the JS bundle URL**
 >

@@ -233,7 +233,7 @@ konuşuyor; genel bir HTTPS tüneli bunu servis etmediği için uygulamaya HTTPS
 kullanması söylenmeli. Expo projelerinde gerekmiyor — `expo-dev-client` kendi
 hallediyor.
 
-İlgili bir React Native hatası [`docs/UPSTREAM_BUGS.md`](docs/UPSTREAM_BUGS.md) içinde
+İlgili bir React Native hatası [`docs/UPSTREAM_BUGS.tr.md`](docs/UPSTREAM_BUGS.tr.md) içinde
 belgelendi: 0.83.1 itibarıyla 8 argümanlı
 `jsBundleURLForBundleRoot:packagerHost:packagerScheme:…` kendisine verilen
 scheme'i atıyor, yani yalnızca `packagerScheme = "https"` yazmak hiçbir işe
@@ -254,7 +254,7 @@ kapalı da değil. Geliştirmek istersen [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Güvenlik
 
 - Bot tam olarak tek bir Telegram kullanıcısına cevap verir: onu sahiplenene.
-- Claude Code sandbox içinde çalışır; bkz. [`docs/SANDBOX.md`](docs/SANDBOX.md).
+- Claude Code sandbox içinde çalışır; bkz. [`docs/SANDBOX.tr.md`](docs/SANDBOX.tr.md).
 - Web paneli `127.0.0.1`'e bağlı ve **kimlik doğrulaması yok** — dışarı açma.
 - `.env` ve `.p8` anahtarın birer sırdır. `.env` gitignore'da; anahtarı repo
   dışında tut.

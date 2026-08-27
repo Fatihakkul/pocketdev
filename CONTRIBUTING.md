@@ -77,8 +77,13 @@ Do not add a test that invokes `xcodebuild`. It will not run in CI.
 | Test names | **English** |
 | Code comments | English or Turkish — your choice |
 | Identifiers, types, function names | English |
-| README, this file, `docs/` | English (the README has a `.tr.md` mirror) |
+| README, this file | English (each has a `.tr.md` mirror) |
+| `docs/` | English by default; a `.tr.md` file is the Turkish mirror |
 | User-facing strings | Both, via `src/i18n/` |
+
+`docs/LOCAL_BUILD.md`, `docs/WEB_UI.md` and `docs/V2.md` are still Turkish-only
+design notes. They are not linked from the English README, so translating them
+is a nice-to-have rather than a gap.
 
 Test names are English so that a failing CI log is readable by anyone. Keep new
 ones in English.

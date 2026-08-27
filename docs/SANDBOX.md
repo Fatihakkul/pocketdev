@@ -1,114 +1,125 @@
-# Kanal oturumlarının kum havuzu
+# Sandboxing channel sessions
 
-Kanal (Telegram/panel) üzerinden açılan Claude oturumlarının erişimini sınırlar.
-**Kullanıcının kendi interaktif Claude Code oturumunu etkilemez** — politika
-yalnızca `claudeRunner`'ın `--settings` ile spawn ettiği sürece verilir;
-`~/.claude/settings.json` ve proje içi `.claude/settings.json` el değmez. Aynı
-sebeple ileride eklenecek hook'lar da bu inline JSON'a girmeli.
+*[Türkçe](SANDBOX.tr.md)*
 
-## Neden gerekliydi
+This limits what a Claude session opened through a channel (Telegram or the web
+panel) can reach. **It does not affect your own interactive Claude Code
+session** — the policy is handed only to the process `claudeRunner` spawns with
+`--settings`; `~/.claude/settings.json` and the project's own
+`.claude/settings.json` are left untouched. For the same reason, any hooks added
+later must go into that same inline JSON.
 
-2026-08-11 ölçümü: bot üzerinden açılan bir oturum, pratikte `you`
-kullanıcısının yapabildiği her şeye erişebiliyordu — `~/.ssh`, Keychain, diğer 9
-proje, sınırsız ağ çıkışı, ve ortamında botun `BOT_TOKEN`'ı. O günkü kısıtlar
-gerçek bir sınır değil, **prefix string eşleşmeli bir filtreydi**:
-`Bash(curl*)` yazılıydı ama `node -e "fetch(...)"` serbestti.
+## Why it was needed
 
-Asıl risk yetkisiz kullanıcı değil (Telegram tarafı tek `ALLOWED_USER_ID` ile
-kilitli): okunan bir repo dosyası, `node_modules` içeriği veya WebFetch'lenen bir
-sayfa üzerinden gelen **prompt injection**, tam yetkiyle çalışan bir ajanla
-buluşuyordu. System prompt ve `RULES.md` bu senaryoda yumuşak katman.
+Measured on 2026-08-11: a session opened through the bot could in practice reach
+everything the `you` user could — `~/.ssh`, the Keychain, nine other projects,
+unrestricted network egress, and the bot's own `BOT_TOKEN` in its environment.
+The restrictions in place at the time were not a real boundary but **a
+prefix-string filter**: `Bash(curl*)` was listed, yet `node -e "fetch(...)"` ran
+freely.
 
-## İki katman, ikisi de gerekli
+The real risk is not an unauthorised user — the Telegram side is locked to a
+single `ALLOWED_USER_ID`. It is **prompt injection** arriving through a file read
+from a repo, something inside `node_modules`, or a page fetched with WebFetch,
+meeting an agent running with full privileges. The system prompt and `RULES.md`
+are only a soft layer against that.
 
-| Katman | Nereye uygulanır | Neyi bağlar |
+## Two layers, both required
+
+| Layer | Where it applies | What it binds |
 | --- | --- | --- |
-| `sandbox.*` | macOS'ta seatbelt (`sandbox-exec`), Linux'ta `bwrap` | Bash ile çalıştırılan komutlar — çekirdek seviyesi |
-| `permissions.deny` | CLI sürecinin içi | `Read` / `Edit` / `Write` araçları |
+| `sandbox.*` | seatbelt (`sandbox-exec`) on macOS, `bwrap` on Linux | commands run through Bash — kernel level |
+| `permissions.deny` | inside the CLI process | the `Read` / `Edit` / `Write` tools |
 
-Yalnız sandbox yazmak yetmez: `cat` engellenir ama Claude `Read` aracını
-kullanır. Ölçümde tam olarak bu oldu — `cat ~/.ssh/id_ed25519` engellendi,
-`Read` aynı dosyayı okudu.
+Writing only the sandbox is not enough: `cat` gets blocked, but Claude reaches
+for the `Read` tool instead. That is exactly what the measurement showed —
+`cat ~/.ssh/id_ed25519` was blocked, and `Read` opened the same file.
 
-## Ölçülen davranış (`src/claude/sandbox.ts`)
+## Measured behaviour (`src/claude/sandbox.ts`)
 
-Kontrollü karşılaştırma — aynı komutlar sandbox açık ve kapalıyken:
+A controlled comparison — the same commands with the sandbox on and off:
 
-| Kontrol | Sandbox açık | Sandbox kapalı |
+| Check | Sandbox on | Sandbox off |
 | --- | --- | --- |
-| `Read` ile `~/.ssh/id_ed25519` | ENGELLENDİ | (kural yok) |
-| `cat ~/.ssh/id_ed25519` | ENGELLENDİ | BAŞARILI |
-| `Read` ile kardeş projedeki dosya | ENGELLENDİ | — |
-| `Read` ile botun `.env`'i | ENGELLENDİ | — |
-| Aktif proje içine yazma | ÇALIŞIYOR | ÇALIŞIYOR |
-| `curl registry.npmjs.org` (allowlist'te) | HTTP 200 | HTTP 200 |
-| `curl example.com` (liste dışı) | 000 (engellendi) | HTTP 200 |
+| `~/.ssh/id_ed25519` via `Read` | BLOCKED | (no rule) |
+| `cat ~/.ssh/id_ed25519` | BLOCKED | SUCCEEDED |
+| A file in a sibling project via `Read` | BLOCKED | — |
+| The bot's own `.env` via `Read` | BLOCKED | — |
+| Writing inside the active project | WORKS | WORKS |
+| `curl registry.npmjs.org` (allowlisted) | HTTP 200 | HTTP 200 |
+| `curl example.com` (not listed) | 000 (blocked) | HTTP 200 |
 
-## Üç tuzak (hepsi ölçümle bulundu)
+## Three traps (all found by measurement)
 
-### 1. İzin kurallarında tek eğik çizgi workspace kökü demek
+### 1. A single slash in a permission rule means the workspace root
 
-`Read(/Users/you/.ssh/**)` kuralı `<proje>/Users/you/.ssh` olarak
-yorumlanıyor ve **hiç eşleşmiyor**. Dosya sistemi kökü için çift eğik çizgi
-gerekiyor: `Read(//Users/you/.ssh/**)`.
+The rule `Read(/Users/you/.ssh/**)` is interpreted as
+`<project>/Users/you/.ssh` and therefore **never matches**. Reaching the
+filesystem root requires a double slash: `Read(//Users/you/.ssh/**)`.
 
-Sinsi olan tarafı: yanlış yazılmış kural hata vermiyor, sessizce eşleşmiyor.
-İlk uygulamada `~/.ssh` bu yüzden okunabilir kalmıştı ve `permission_denials`
-boş döndüğü için "çalışıyor" gibi görünüyordu. `sandbox.filesystem.*` tarafında
-ise tek eğik çizgili mutlak yol doğru — iki katmanın sözdizimi farklı.
+The insidious part is that a mistyped rule raises no error — it silently fails
+to match. In the first implementation `~/.ssh` stayed readable for exactly this
+reason, and because `permission_denials` came back empty it looked like it was
+working. On the `sandbox.filesystem.*` side a single-slash absolute path is
+correct — the two layers do not share a syntax.
 
-### 2. Ağ kısıtı proxy ile uygulanıyor
+### 2. The network restriction is enforced through a proxy
 
-Seatbelt'te `deny default` var; izinli alan adlarına trafik **yerel bir
-HTTP/SOCKS proxy** üzerinden geçiyor (CA sertifikası enjekte ediliyor,
-`NO_PROXY` localhost ve özel IP aralıklarını dışarıda bırakıyor). Sonucu:
+Seatbelt has `deny default`; traffic to allowed domains goes through **a local
+HTTP/SOCKS proxy** (a CA certificate is injected, and `NO_PROXY` keeps localhost
+and the private IP ranges out). The consequences:
 
-- `curl`, `git`, `npm` proxy'yi onurlandırdığı için allowlist çalışır →
-  Claude oturumlarında `npm install` bozulmaz
-- Node'un global `fetch`'i `HTTP_PROXY`'yi umursamaz → allowlist'te olsa bile
-  geçemez. İlk ağ testimizin yanıltıcı çıkmasının sebebi buydu; **güvenlik
-  tarafında ise kazanç**: injection ile gelen `node -e "fetch(...)"` tabanlı bir
-  exfiltration denemesi alan adı ne olursa olsun ölür
+- `curl`, `git` and `npm` honour the proxy, so the allowlist works — `npm
+  install` does not break inside Claude sessions.
+- Node's global `fetch` ignores `HTTP_PROXY`, so it cannot get through even to
+  an allowlisted domain. This is why our first network test read as misleading.
+  On the **security side it is a win**: an exfiltration attempt arriving through
+  injection as `node -e "fetch(...)"` dies regardless of the domain.
 
-### 3. Yanlış anahtar sessizce yok sayılır
+### 3. A misspelled key is ignored silently
 
-`failIfUnavailable: true` yalnızca sandbox'ın *kurulamadığı* durumu yakalar.
-Anahtar adı hatalıysa politika hiç yüklenmez ve korumalı olduğumuzu sanırız —
-1. tuzak tam olarak böyle keşfedildi.
+`failIfUnavailable: true` only catches the case where the sandbox *cannot be
+established*. If a key name is wrong the policy is never loaded at all and we
+believe we are protected — which is precisely how the first trap was found.
 
-Bu yüzden bot açılışta **kanarya testi** çalıştırıyor
-(`src/claude/sandboxSelfTest.ts`): politika reddetmesi gereken bir dosyayı
-(`data/state.json`) okumayı dener ve engellendiğini görmeden serbest mesajları
-kabul etmez. Doğrulanmadan gelen mesajlara `handleMessage` ret döner.
-`SANDBOX_SELFTEST=0` ile kapatılabilir (her açılışta küçük bir model koşusu
-maliyeti var), ama varsayılan açık.
+Because of that the bot runs a **canary test** at startup
+(`src/claude/sandboxSelfTest.ts`): it tries to read a file the policy is
+supposed to deny (`data/state.json`) and refuses to accept free-form messages
+until it has seen that read blocked. Until verification passes, `handleMessage`
+rejects incoming messages. It can be turned off with `SANDBOX_SELFTEST=0` — it
+costs a small model run at every startup — but the default is on.
 
-## Politikanın kapsamı
+## What the policy covers
 
-**Okumaya kapalı:** `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.docker`, `~/.config/gh`,
-`~/.npmrc`, `~/Library/Keychains`, `~/.claude`, botun `.env` ve `data/`
-klasörü, **ve aktif projenin tüm kardeşleri**.
+**Closed to reads:** `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.docker`,
+`~/.config/gh`, `~/.npmrc`, `~/Library/Keychains`, `~/.claude`, the bot's `.env`
+and `data/` folder, **and every sibling of the active project**.
 
-Kardeşler çalışma anında sayılıp tek tek reddediliyor. Denylist'te "şu dizin
-hariç" ifadesi olmadığı için istisna yazmak yerine kardeşleri saymak gerekti;
-bu hem workspace içindeki hem bağlı (workspace dışı) projeler için çalışıyor.
+Siblings are enumerated at runtime and denied one by one. A denylist has no way
+to say "except this directory", so instead of writing an exception the siblings
+had to be counted; this works both for projects inside the workspace and for
+linked projects outside it.
 
-**Ortam değişkenleri allowlist** (`claudeRunner.childEnv`): `PATH`, `HOME`,
-`USER`, `SHELL`, `TMPDIR`, dil/`TERM` değişkenleri ve `ANTHROPIC_*` / `CLAUDE_*`
-önekleri geçer. `BOT_TOKEN`, `ALLOWED_USER_ID` ve sonradan eklenecek her sır
-otomatik olarak dışarıda kalır — denylist yazsaydık her yeni sır sızardı.
-`SSH_AUTH_SOCK` de kasıtlı olarak yok: geçseydi `~/.ssh` okunamasa bile ajan
-üzerinden anahtarlarla imzalama yapılabilirdi.
+**Environment variables are an allowlist** (`claudeRunner.childEnv`): `PATH`,
+`HOME`, `USER`, `SHELL`, `TMPDIR`, the locale and `TERM` variables, and the
+`ANTHROPIC_*` / `CLAUDE_*` prefixes get through. `BOT_TOKEN`, `ALLOWED_USER_ID`
+and every secret added later stay out automatically — with a denylist, each new
+secret would leak. `SSH_AUTH_SOCK` is deliberately absent too: if it passed
+through, the agent could sign with the keys even without being able to read
+`~/.ssh`.
 
-## Bilinen boşluklar
+## Known gaps
 
-- **Komut niyeti hâlâ string eşleşmesiyle kısıtlı.** `Bash(git commit*)` gibi
-  kurallar duruyor ve `git -C /path commit` onları atlar. Gerçek çözüm
-  `PreToolUse` hook'u: normalize edilmiş komutu görüp allowlist uygular.
-  Yapılmadı.
-- **Bot deposunun kendi kaynak kodu okunabilir** (yalnız `.env` ve `data/`
-  kapalı). Bot workspace'in üstünde durduğu için kardeş sayımına girmiyor.
-- **Kardeş listesi koşu anında donuyor.** Uzun bir oturum sürerken açılan yeni
-  bir kardeş dizin o oturumda reddedilmez; sonraki koşuda listeye girer.
-- **Yazma, aktif proje dışında da mümkün olabilir** — açıkça reddedilen yollar
-  dışında sandbox'ın varsayılan yazma duruşuna güveniliyor, ölçülmedi.
+- **Command intent is still limited to string matching.** Rules like
+  `Bash(git commit*)` remain, and `git -C /path commit` walks past them. The
+  real fix is a `PreToolUse` hook that sees the normalised command and applies
+  an allowlist. Not done.
+- **The bot repository's own source is readable** (only `.env` and `data/` are
+  closed). The bot sits above the workspace, so it is not part of the sibling
+  enumeration.
+- **The sibling list is frozen at run time.** A new sibling directory created
+  during a long session is not denied within that session; it enters the list on
+  the next run.
+- **Writing outside the active project may be possible** — beyond the explicitly
+  denied paths, this relies on the sandbox's default write posture and has not
+  been measured.
