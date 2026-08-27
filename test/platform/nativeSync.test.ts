@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe("nativeInputsHash", () => {
-  test("package.json değişince özet değişir", () => {
+  test("the hash changes when package.json changes", () => {
     write("package.json", `{"dependencies":{}}`);
     const before = nativeInputsHash(projectPath, EXPO_INPUTS);
 
@@ -41,7 +41,7 @@ describe("nativeInputsHash", () => {
     assert.notEqual(nativeInputsHash(projectPath, EXPO_INPUTS), before);
   });
 
-  test("app.config.js değişince de özet değişir — app.json tek olasılık değil", () => {
+  test("the hash also changes when app.config.js changes — app.json is not the only option", () => {
     write("package.json", `{"dependencies":{}}`);
     write("app.config.js", `module.exports = { expo: { plugins: [] } };`);
     const before = nativeInputsHash(projectPath, EXPO_INPUTS);
@@ -50,7 +50,7 @@ describe("nativeInputsHash", () => {
     assert.notEqual(nativeInputsHash(projectPath, EXPO_INPUTS), before);
   });
 
-  test("app.json değişince de özet değişir (config plugin eklenebilir)", () => {
+  test("the hash also changes when app.json changes (a config plugin may be added)", () => {
     write("package.json", `{}`);
     write("app.json", `{"expo":{"plugins":[]}}`);
     const before = nativeInputsHash(projectPath, EXPO_INPUTS);
@@ -59,7 +59,7 @@ describe("nativeInputsHash", () => {
     assert.notEqual(nativeInputsHash(projectPath, EXPO_INPUTS), before);
   });
 
-  test("dosyanın yokluğu da özetin parçası", () => {
+  test("a missing file is part of the hash too", () => {
     write("package.json", `{}`);
     const withoutAppJson = nativeInputsHash(projectPath, EXPO_INPUTS);
 
@@ -69,12 +69,12 @@ describe("nativeInputsHash", () => {
 });
 
 describe("needsSync", () => {
-  test("ios/ klasörü hiç yoksa eşitleme gerekir", () => {
+  test("a sync is needed when there is no ios/ folder at all", () => {
     write("package.json", `{}`);
     assert.equal(needsSync(projectPath, EXPO_INPUTS), true);
   });
 
-  test("damga güncelken eşitleme gerekmez", () => {
+  test("no sync is needed while the stamp is current", () => {
     write("package.json", `{}`);
     write("ios/Podfile.lock", "PODS:");
     writeStamp(projectPath, EXPO_INPUTS);
@@ -82,7 +82,7 @@ describe("needsSync", () => {
     assert.equal(needsSync(projectPath, EXPO_INPUTS), false);
   });
 
-  test("damgadan sonra bağımlılık eklenirse eşitleme gerekir", () => {
+  test("a sync is needed when a dependency is added after the stamp", () => {
     write("package.json", `{"dependencies":{}}`);
     write("ios/Podfile.lock", "PODS:");
     writeStamp(projectPath, EXPO_INPUTS);
@@ -91,7 +91,7 @@ describe("needsSync", () => {
     assert.equal(needsSync(projectPath, EXPO_INPUTS), true);
   });
 
-  test("damga bozuksa (okunamıyorsa) Podfile.lock tarihine düşer", () => {
+  test("falls back to the Podfile.lock timestamp when the stamp is unreadable", () => {
     write("package.json", `{}`);
     write("ios/Podfile.lock", "PODS:");
     write("build/prebuild-stamp.json", "bu json değil");
@@ -101,7 +101,7 @@ describe("needsSync", () => {
     assert.equal(needsSync(projectPath, EXPO_INPUTS), false);
   });
 
-  test("damga yokken Podfile.lock'tan yeni package.json bayat sayılır", () => {
+  test("with no stamp, a package.json newer than Podfile.lock counts as stale", () => {
     write("ios/Podfile.lock", "PODS:");
     const past = Date.now() - 60_000;
     fs.utimesSync(path.join(projectPath, "ios/Podfile.lock"), past / 1000, past / 1000);
@@ -110,7 +110,7 @@ describe("needsSync", () => {
     assert.equal(needsSync(projectPath, EXPO_INPUTS), true);
   });
 
-  test("damga yokken Podfile.lock yoksa eşitleme gerekir", () => {
+  test("with no stamp and no Podfile.lock, a sync is needed", () => {
     write("package.json", `{}`);
     fs.mkdirSync(path.join(projectPath, "ios"), { recursive: true });
 
@@ -118,8 +118,8 @@ describe("needsSync", () => {
   });
 });
 
-describe("girdi listesi proje tipine göre değişir", () => {
-  test("RN CLI'da ios/Podfile girdi, app.json değil", () => {
+describe("the input list depends on the project type", () => {
+  test("on RN CLI the input is ios/Podfile, not app.json", () => {
     write("package.json", `{}`);
     write("app.json", `{"name":"x"}`);
     write("ios/Podfile", "platform :ios, '15.1'");
@@ -134,7 +134,7 @@ describe("girdi listesi proje tipine göre değişir", () => {
     assert.notEqual(nativeInputsHash(projectPath, RN_CLI_INPUTS), before);
   });
 
-  test("Podfile'a pod eklenince RN CLI'da eşitleme gerekir", () => {
+  test("adding a pod to the Podfile requires a sync on RN CLI", () => {
     write("package.json", `{}`);
     write("ios/Podfile", "platform :ios");
     write("ios/Podfile.lock", "PODS:");
@@ -145,7 +145,7 @@ describe("girdi listesi proje tipine göre değişir", () => {
     assert.equal(needsSync(projectPath, RN_CLI_INPUTS), true);
   });
 
-  test("damga tek dosya — iki liste aynı damgayı paylaşır ve tip değişirse bayat sayılır", () => {
+  test("the stamp is one file — both lists share it, so a type change counts as stale", () => {
     // Bir projenin tipi değişirse (ör. Expo'ya geçiş) damga eşleşmez ve bir kez
     // fazladan eşitleme olur. Doğru taraf bu: az eşitleme, eksik native modül
     // demek; fazla eşitleme yalnızca zaman kaybı.
@@ -160,7 +160,7 @@ describe("girdi listesi proje tipine göre değişir", () => {
 });
 
 describe("writeStamp", () => {
-  test("damga eşitleme sonrası değişen girdileri yakalar", () => {
+  test("the stamp captures inputs changed by the sync itself", () => {
     // Gerçek senaryo: prebuild eksik bağımlılığı package.json'a kendisi yazıyor.
     // Damga prebuild BİTTİKTEN sonra alındığı için bir sonraki build gereksiz
     // yere yeniden eşitlememeli.

@@ -30,7 +30,7 @@ afterEach(() => {
 describe("parseBuildSettings", () => {
   const entry = (buildSettings: Record<string, string>): string => JSON.stringify([{ buildSettings }]);
 
-  test("bundle id, isim ve sürümü okur", () => {
+  test("reads the bundle id, name and version", () => {
     const info = parseBuildSettings(
       entry({
         PRODUCT_BUNDLE_IDENTIFIER: "com.ornek.app",
@@ -48,7 +48,7 @@ describe("parseBuildSettings", () => {
     });
   });
 
-  test("bundle id taşıyan ilk hedefi seçer — baştaki ayarsız hedefi atlar", () => {
+  test("picks the first target carrying a bundle id — skipping an unconfigured leading target", () => {
     const stdout = JSON.stringify([
       { target: "Pods-Ornek", buildSettings: { PRODUCT_NAME: "Pods" } },
       { target: "Ornek", buildSettings: { PRODUCT_BUNDLE_IDENTIFIER: "com.ornek.app" } },
@@ -56,21 +56,21 @@ describe("parseBuildSettings", () => {
     assert.equal(parseBuildSettings(stdout, "yedek").bundleId, "com.ornek.app");
   });
 
-  test("PRODUCT_NAME yoksa klasör adına düşer, sürüm yoksa '?'", () => {
+  test("falls back to the folder name without PRODUCT_NAME, and to '?' without a version", () => {
     const info = parseBuildSettings(entry({ PRODUCT_BUNDLE_IDENTIFIER: "com.ornek.app" }), "yedek");
     assert.equal(info.appName, "yedek");
     assert.equal(info.version, "?");
     assert.equal(info.appIconName, "AppIcon");
   });
 
-  test("bundle id hiç yoksa imzalama profilinin seçilemeyeceğini söyler", () => {
+  test("says no signing profile can be chosen when there is no bundle id at all", () => {
     assert.throws(
       () => parseBuildSettings(entry({ PRODUCT_NAME: "Ornek" }), "yedek"),
       /PRODUCT_BUNDLE_IDENTIFIER/
     );
   });
 
-  test("JSON değilse anlaşılır hata verir", () => {
+  test("gives a readable error when the output is not JSON", () => {
     assert.throws(() => parseBuildSettings("** BUILD FAILED **", "yedek"), (error: Error) => {
       assert.equal(error.message, m().runtime.buildSettingsUnreadable);
       return true;
@@ -79,7 +79,7 @@ describe("parseBuildSettings", () => {
 });
 
 describe("findAppIcon", () => {
-  test("appiconset içindeki en büyük png'yi seçer", () => {
+  test("picks the largest png in the appiconset", () => {
     write("ios/Ornek/Images.xcassets/AppIcon.appiconset/20.png", "x".repeat(100));
     write("ios/Ornek/Images.xcassets/AppIcon.appiconset/1024.png", "x".repeat(5000));
     write("ios/Ornek/Images.xcassets/AppIcon.appiconset/Contents.json", "{}");
@@ -90,7 +90,7 @@ describe("findAppIcon", () => {
     );
   });
 
-  test("özel ikon adını kullanır", () => {
+  test("uses a custom icon name", () => {
     write("ios/Ornek/Images.xcassets/AppIcon.appiconset/1024.png", "x");
     write("ios/Ornek/Images.xcassets/DevIcon.appiconset/1024.png", "y");
 
@@ -98,26 +98,26 @@ describe("findAppIcon", () => {
     assert.match(found, /DevIcon\.appiconset/);
   });
 
-  test("ikon yoksa boş dizge — kurulum sayfası ikonsuz çalışmaya devam eder", () => {
+  test("empty string when there is no icon — the install page still works without one", () => {
     write("ios/Ornek/Info.plist", "<plist/>");
     assert.equal(findAppIcon(path.join(projectPath, "ios"), "AppIcon"), "");
   });
 
-  test("appiconset boşsa da boş dizge", () => {
+  test("empty string for an empty appiconset too", () => {
     fs.mkdirSync(path.join(projectPath, "ios/Ornek/Images.xcassets/AppIcon.appiconset"), {
       recursive: true,
     });
     assert.equal(findAppIcon(path.join(projectPath, "ios"), "AppIcon"), "");
   });
 
-  test("Pods/ taranmaz — orada binlerce dizin var", () => {
+  test("Pods/ is not scanned — it holds thousands of directories", () => {
     write("ios/Pods/SomeLib/Images.xcassets/AppIcon.appiconset/1024.png", "x");
     assert.equal(findAppIcon(path.join(projectPath, "ios"), "AppIcon"), "");
   });
 });
 
 describe("podInstallCommand", () => {
-  test("Gemfile varsa bundle exec — CocoaPods sürümü orada sabitli", () => {
+  test("bundle exec when a Gemfile exists — the CocoaPods version is pinned there", () => {
     write("Gemfile", "gem 'cocoapods'");
     assert.deepEqual(podInstallCommand(projectPath), {
       file: "bundle",
@@ -125,35 +125,35 @@ describe("podInstallCommand", () => {
     });
   });
 
-  test("Gemfile yoksa düz pod", () => {
+  test("plain pod without a Gemfile", () => {
     assert.deepEqual(podInstallCommand(projectPath), { file: "pod", args: ["install"] });
   });
 });
 
 describe("buildModeFlag", () => {
-  test("RN 0.83.1 (example-rn-app ile doğrulandı) --mode", () => {
+  test("RN 0.83.1 uses --mode (verified against example-rn-app)", () => {
     // `react-native run-ios --help` çıktısı: `--mode <string>` var,
     // `--configuration` yok.
     assert.equal(buildModeFlag("0.83.1"), "--mode");
   });
 
-  test("0.73 ve sonrası --mode", () => {
+  test("0.73 and later use --mode", () => {
     assert.equal(buildModeFlag("0.76.0"), "--mode");
     assert.equal(buildModeFlag("^0.73.0"), "--mode");
     assert.equal(buildModeFlag("0.73.0"), "--mode");
   });
 
-  test("0.73 öncesi --configuration", () => {
+  test("before 0.73 it is --configuration", () => {
     assert.equal(buildModeFlag("0.72.6"), "--configuration");
     assert.equal(buildModeFlag("~0.71.0"), "--configuration");
   });
 
-  test("aralık okunamazsa yeni bayrağa düşer", () => {
+  test("falls back to the newer flag when the range is unreadable", () => {
     assert.equal(buildModeFlag(undefined), "--mode");
     assert.equal(buildModeFlag("*"), "--mode");
   });
 
-  test("1.x geldiğinde de yeni bayrak", () => {
+  test("1.x also gets the newer flag", () => {
     assert.equal(buildModeFlag("1.0.0"), "--mode");
   });
 });

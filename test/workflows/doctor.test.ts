@@ -12,13 +12,13 @@ import { m } from "../../src/i18n/index.js";
 const ok = (name: string): CheckResult => ({ name, status: "ok", detail: "hazır" });
 
 describe("formatDoctorReport", () => {
-  test("her şey yolundaysa tek cümlelik özet veriyor", () => {
+  test("gives a one-sentence summary when everything is fine", () => {
     const report = formatDoctorReport([ok("Xcode"), ok("Tunnel")]);
     assert.ok(report.includes(m().doctor.allGood));
     assert.ok(!report.includes(m().doctor.countMissing(1)));
   });
 
-  test("eksik ve uyarı ayrı ayrı sayılıyor", () => {
+  test("missing items and warnings are counted separately", () => {
     const report = formatDoctorReport([
       ok("Xcode"),
       { name: "Tunnel", status: "fail", detail: "kullanılamıyor", fix: "Funnel'ı aç" },
@@ -27,7 +27,7 @@ describe("formatDoctorReport", () => {
     assert.ok(report.includes(`${m().doctor.countMissing(1)}, ${m().doctor.countWarnings(1)}`));
   });
 
-  test("çözüm yalnızca sorunlu kontroller için gösteriliyor", () => {
+  test("the fix is shown only for failing checks", () => {
     // "ok" bir kontrolün fix'i varsa bile gösterilmemeli; rapor uzadıkça
     // okunmuyor ve bu komutun bütün amacı hızlı okunabilmek.
     const report = formatDoctorReport([
@@ -38,18 +38,18 @@ describe("formatDoctorReport", () => {
     assert.match(report, /gösterilmeli/);
   });
 
-  test("çok satırlı çözüm hizalanıyor", () => {
+  test("a multi-line fix is indented consistently", () => {
     const report = formatDoctorReport([
       { name: "Tunnel", status: "fail", detail: "yok", fix: "birinci satır\nikinci satır" },
     ]);
     assert.match(report, /\n {3}birinci satır\n {3}ikinci satır/);
   });
 
-  test("proje adı verilirse başlıkta görünüyor", () => {
+  test("the project name appears in the heading when given", () => {
     assert.ok(formatDoctorReport([ok("Xcode")], "example-rn-app").includes("example-rn-app"));
   });
 
-  test("proje adı yoksa başlık sade kalıyor", () => {
+  test("the heading stays plain without a project name", () => {
     const report = formatDoctorReport([ok("Xcode")]);
     assert.ok(report.startsWith(m().doctor.scope));
     assert.ok(!report.includes("example-rn-app"));

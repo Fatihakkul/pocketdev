@@ -41,15 +41,15 @@ function flatten(node: Node, prefix = ""): Array<[string, string]> {
 }
 
 for (const [locale, dictionary] of Object.entries(LOCALES)) {
-  describe(`sözlük: ${locale}`, () => {
+  describe(`dictionary: ${locale}`, () => {
     const entries = flatten(dictionary as unknown as Node);
 
-    test("boş metin yok", () => {
+    test("no blank strings", () => {
       const empty = entries.filter(([, text]) => text.trim().length === 0).map(([path]) => path);
       assert.deepEqual(empty, [], `boş çeviri: ${empty.join(", ")}`);
     });
 
-    test("her fonksiyon aldığı her argümanı metne koyuyor", () => {
+    test("every function puts each argument it takes into its output", () => {
       // Yer tutucuyu kullanmayı unutmak sessiz bir hata: mesaj gider ama bundle
       // id ya da asıl hata sebebi düşer, kullanıcı da neyin yanlış olduğunu
       // anlamaz.
@@ -64,20 +64,20 @@ for (const [locale, dictionary] of Object.entries(LOCALES)) {
       assert.deepEqual(dropped, [], `kullanılmayan argüman: ${dropped.join(", ")}`);
     });
 
-    test("en az bir metin üretiliyor", () => {
+    test("at least one string is produced", () => {
       assert.ok(entries.length > 0);
     });
   });
 }
 
-describe("sözlükler arası tutarlılık", () => {
-  test("iki dilde de aynı anahtar yolları var", () => {
+describe("consistency across dictionaries", () => {
+  test("both languages have the same key paths", () => {
     const paths = Object.values(LOCALES).map((d) => flatten(d as unknown as Node).map(([p]) => p).sort());
     const [first, ...rest] = paths;
     for (const other of rest) assert.deepEqual(other, first);
   });
 
-  test("fonksiyonlar iki dilde de aynı sayıda argüman alıyor", () => {
+  test("functions take the same number of arguments in both languages", () => {
     // Aksi halde bir dilde yer tutucu düşer ve kullanıcı eksik bilgi görür.
     const arity = (node: Node, prefix = ""): Array<[string, number]> =>
       Object.entries(node).flatMap(([key, value]) => {

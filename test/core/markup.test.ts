@@ -10,49 +10,49 @@ import { escapeHtml, markupToHtml, markupToPlain } from "../../src/core/markup.j
  */
 
 describe("escapeHtml", () => {
-  test("HTML özel karakterlerini kaçırır", () => {
+  test("escapes HTML special characters", () => {
     assert.equal(escapeHtml("<b>x</b>"), "&lt;b&gt;x&lt;/b&gt;");
   });
 
-  test("& önce kaçırılır, çift kaçış olmaz", () => {
+  test("& is escaped first, so nothing is double-escaped", () => {
     assert.equal(escapeHtml("a & <b>"), "a &amp; &lt;b&gt;");
     assert.equal(escapeHtml("&lt;"), "&amp;lt;");
   });
 });
 
 describe("markupToHtml", () => {
-  test("kod ve kalın dönüşür", () => {
-    assert.equal(markupToHtml("`kod` ve **kalın**"), "<code>kod</code> ve <b>kalın</b>");
+  test("code and bold are converted", () => {
+    assert.equal(markupToHtml("`code` and **bold**"), "<code>code</code> and <b>bold</b>");
   });
 
-  test("içerikteki HTML dönüşümden önce kaçırılır", () => {
+  test("HTML in the content is escaped before conversion", () => {
     assert.equal(markupToHtml("`<script>`"), "<code>&lt;script&gt;</code>");
   });
 
-  test("kullanıcı HTML'i etiket olarak geçemez", () => {
-    assert.equal(markupToHtml("<b>sahte</b>"), "&lt;b&gt;sahte&lt;/b&gt;");
+  test("user HTML cannot pass through as a tag", () => {
+    assert.equal(markupToHtml("<b>fake</b>"), "&lt;b&gt;fake&lt;/b&gt;");
   });
 
-  test("birden çok işaretleme aynı satırda", () => {
-    assert.equal(markupToHtml("**a** ve `b` ve **c**"), "<b>a</b> ve <code>b</code> ve <b>c</b>");
+  test("several markup spans on one line", () => {
+    assert.equal(markupToHtml("**a** and `b` and **c**"), "<b>a</b> and <code>b</code> and <b>c</b>");
   });
 
-  test("eşleşmeyen işaret olduğu gibi kalır", () => {
-    assert.equal(markupToHtml("tek ` ters tırnak"), "tek ` ters tırnak");
-    assert.equal(markupToHtml("tek ** yıldız"), "tek ** yıldız");
+  test("an unmatched marker is left as-is", () => {
+    assert.equal(markupToHtml("one ` backtick"), "one ` backtick");
+    assert.equal(markupToHtml("two ** stars"), "two ** stars");
   });
 
-  test("çok satırlı metin korunur", () => {
-    assert.equal(markupToHtml("bir\n`iki`"), "bir\n<code>iki</code>");
+  test("multi-line text is preserved", () => {
+    assert.equal(markupToHtml("one\n`two`"), "one\n<code>two</code>");
   });
 });
 
 describe("markupToPlain", () => {
-  test("işaretlemeyi söker, metni bırakır", () => {
-    assert.equal(markupToPlain("`kod` ve **kalın**"), "kod ve kalın");
+  test("strips the markup and keeps the text", () => {
+    assert.equal(markupToPlain("`code` and **bold**"), "code and bold");
   });
 
-  test("HTML'e dokunmaz — kaçış yok", () => {
+  test("leaves HTML alone — no escaping", () => {
     assert.equal(markupToPlain("<b>x</b>"), "<b>x</b>");
   });
 });

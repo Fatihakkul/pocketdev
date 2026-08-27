@@ -56,40 +56,40 @@ afterEach(() => {
   fs.rmSync(projectPath, { recursive: true, force: true });
 });
 
-describe("readExpoConfig — statik yol", () => {
-  test("app.json okunur (bugünkü davranışın regresyon koruması)", async () => {
+describe("readExpoConfig — static path", () => {
+  test("app.json is read (regression guard for today's behaviour)", async () => {
     write("app.json", `{"expo":{"name":"Renkler","ios":{"bundleIdentifier":"com.renkler.app"}}}`);
     const config = await readExpoConfig(projectPath);
     assert.equal(config.name, "Renkler");
     assert.equal(config.ios.bundleIdentifier, "com.renkler.app");
   });
 
-  test("app.config.json de okunur", async () => {
+  test("app.config.json is read too", async () => {
     write("app.config.json", `{"expo":{"name":"Cfg","ios":{"bundleIdentifier":"com.cfg.app"}}}`);
     const config = await readExpoConfig(projectPath);
     assert.equal(config.ios.bundleIdentifier, "com.cfg.app");
   });
 
-  test("app.config.json, app.json'dan önce gelir — Expo'nun sırası", async () => {
+  test("app.config.json comes before app.json — Expo's own order", async () => {
     write("app.json", `{"expo":{"name":"Eski"}}`);
     write("app.config.json", `{"expo":{"name":"Yeni"}}`);
     assert.equal((await readExpoConfig(projectPath)).name, "Yeni");
   });
 
-  test("expo anahtarı olmayan düz JSON da kabul edilir", async () => {
+  test("plain JSON without an expo key is accepted too", async () => {
     write("app.json", `{"name":"Duz","ios":{"bundleIdentifier":"com.duz.app"}}`);
     assert.equal((await readExpoConfig(projectPath)).ios.bundleIdentifier, "com.duz.app");
   });
 });
 
-describe("readExpoConfig — CLI yolu", () => {
-  test("expo binary varsa çözümlenmiş config kullanılır", async () => {
+describe("readExpoConfig — CLI path", () => {
+  test("the resolved config is used when the expo binary exists", async () => {
     fakeExpoBin({ name: "Cozumlenmis", ios: { bundleIdentifier: "com.cli.app" } });
     const config = await readExpoConfig(projectPath);
     assert.equal(config.ios.bundleIdentifier, "com.cli.app");
   });
 
-  test("dinamik config app.json'ı EZER — sessizce yanlış okuma buradan geliyordu", async () => {
+  test("a dynamic config OVERRIDES app.json — this is where the silently wrong read came from", async () => {
     // Statik dosya eski değeri taşıyor, app.config.js üzerine yazıyor.
     write("app.json", `{"expo":{"ios":{"bundleIdentifier":"com.eski.app"}}}`);
     write("app.config.js", `module.exports = { expo: { ios: { bundleIdentifier: "com.yeni.app" } } };`);
@@ -99,28 +99,28 @@ describe("readExpoConfig — CLI yolu", () => {
     assert.equal(config.ios.bundleIdentifier, "com.yeni.app");
   });
 
-  test("app.json hiç yokken app.config.js'li proje çalışır", async () => {
+  test("a project with app.config.js works with no app.json at all", async () => {
     write("app.config.ts", `export default { expo: { name: "Dinamik" } };`);
     fakeExpoBin({ name: "Dinamik", ios: { bundleIdentifier: "com.dinamik.app" } });
     assert.equal((await readExpoConfig(projectPath)).ios.bundleIdentifier, "com.dinamik.app");
   });
 
-  test("CLI patlarsa statik okumaya düşer", async () => {
+  test("falls back to the static read when the CLI fails", async () => {
     write("app.json", `{"expo":{"name":"Yedek"}}`);
     failingExpoBin();
     assert.equal((await readExpoConfig(projectPath)).name, "Yedek");
   });
 });
 
-describe("readExpoConfig — hatalar", () => {
-  test("hiç config yoksa net hata", async () => {
+describe("readExpoConfig — errors", () => {
+  test("a clear error when there is no config at all", async () => {
     await assert.rejects(readExpoConfig(projectPath), (error: Error) => {
       assert.equal(error.message, m().runtime.expoConfigMissing);
       return true;
     });
   });
 
-  test("dinamik config var ama değerlendirilemiyorsa npm install önerilir", async () => {
+  test("suggests npm install when a dynamic config exists but cannot be evaluated", async () => {
     // Binary yok: app.config.js çalıştırılamaz ve okunacak statik dosya da yok.
     write("app.config.js", `module.exports = { expo: {} };`);
     await assert.rejects(readExpoConfig(projectPath), (error: Error) => {
@@ -130,8 +130,8 @@ describe("readExpoConfig — hatalar", () => {
   });
 });
 
-describe("readExpoConfig — önbellek", () => {
-  test("config dosyası değişince yeniden okunur", async () => {
+describe("readExpoConfig — cache", () => {
+  test("re-reads when a config file changes", async () => {
     write("app.json", `{"expo":{"name":"Once"}}`);
     assert.equal((await readExpoConfig(projectPath)).name, "Once");
 
@@ -146,18 +146,18 @@ describe("readExpoConfig — önbellek", () => {
 });
 
 describe("EXPO_SPECIFIC_CONFIG_FILES", () => {
-  test("app.json dışarıda — RN CLI projelerinde de var", () => {
+  test("app.json is excluded — RN CLI projects have one too", () => {
     assert.equal(EXPO_SPECIFIC_CONFIG_FILES.includes("app.json"), false);
     assert.equal(EXPO_CONFIG_FILES.includes("app.json"), true);
   });
 
-  test("dinamik uzantıların hepsi tanınır", () => {
+  test("every dynamic extension is recognised", () => {
     for (const ext of [".ts", ".mts", ".cts", ".mjs", ".cjs", ".js"]) {
       assert.equal(EXPO_SPECIFIC_CONFIG_FILES.includes(`app.config${ext}`), true, ext);
     }
   });
 
-  test("hasDynamicConfig yalnızca JS/TS config'i sayar", () => {
+  test("hasDynamicConfig counts only a JS/TS config", () => {
     write("app.json", `{"expo":{}}`);
     assert.equal(hasDynamicConfig(projectPath), false);
     write("app.config.js", `module.exports = {};`);
@@ -166,7 +166,7 @@ describe("EXPO_SPECIFIC_CONFIG_FILES", () => {
 });
 
 describe("expoNativeInputsHash", () => {
-  test("plugin listesi app.config.js içinde değişince özet değişir", async () => {
+  test("the hash changes when the plugin list changes inside app.config.js", async () => {
     write("package.json", `{"dependencies":{"expo":"~57.0.0"}}`);
     write("app.config.js", `module.exports = { expo: { plugins: [] } };`);
     fakeExpoBin({ plugins: [] });
@@ -179,7 +179,7 @@ describe("expoNativeInputsHash", () => {
     assert.notEqual(after, before);
   });
 
-  test("dosya içeriği aynı kalsa da çözümlenmiş çıktı değişirse yakalanır", async () => {
+  test("a changed resolved output is caught even when the file content is identical", async () => {
     // Dinamik config plugin listesini .env'den üretiyor olabilir: app.config.js
     // hiç değişmeden native taraf değişir. Dosya hash'i bunu kaçırır.
     write("package.json", `{"dependencies":{"expo":"~57.0.0"}}`);
@@ -195,7 +195,7 @@ describe("expoNativeInputsHash", () => {
     assert.notEqual(after, before);
   });
 
-  test("package.json değişince de özet değişir", async () => {
+  test("the hash also changes when package.json changes", async () => {
     write("package.json", `{"dependencies":{"expo":"~57.0.0"}}`);
     fakeExpoBin({ name: "x" });
     const before = await expoNativeInputsHash(projectPath);

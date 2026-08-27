@@ -22,70 +22,70 @@ afterEach(() => {
 });
 
 describe("detectProjectKind", () => {
-  test("package.json'da expo bağımlılığı varsa expo", () => {
+  test("expo when package.json has the expo dependency", () => {
     write("package.json", `{"dependencies":{"expo":"~54.0.0"}}`);
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("devDependencies'teki expo de sayılır", () => {
+  test("expo in devDependencies counts too", () => {
     write("package.json", `{"devDependencies":{"expo":"~54.0.0"}}`);
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("bağımlılık yoksa app.json'daki expo anahtarı yeter", () => {
+  test("without the dependency, the expo key in app.json is enough", () => {
     write("package.json", `{"dependencies":{}}`);
     write("app.json", `{"expo":{"name":"x"}}`);
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("bağımlılık yoksa app.config.ts varlığı yeter", () => {
+  test("without the dependency, the presence of app.config.ts is enough", () => {
     write("package.json", `{"dependencies":{}}`);
     write("app.config.ts", `export default { expo: { name: "x" } };`);
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("app.config.json da Expo sinyali", () => {
+  test("app.config.json is an Expo signal too", () => {
     write("package.json", `{"dependencies":{}}`);
     write("app.config.json", `{"expo":{"name":"x"}}`);
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("ios/Podfile + react-native varsa react-native-cli", () => {
+  test("react-native-cli when ios/Podfile and react-native are present", () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
     assert.equal(detectProjectKind(projectPath), "react-native-cli");
   });
 
-  test("RN CLI'daki app.json projeyi Expo yapmaz — orada yalnızca uygulama adı var", () => {
+  test("app.json in an RN CLI project does not make it Expo — it only carries the app name there", () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
     write("app.json", `{"name":"MyApp","displayName":"My App"}`);
     assert.equal(detectProjectKind(projectPath), "react-native-cli");
   });
 
-  test("Expo, RN CLI'dan önce gelir — Expo projesinde de Podfile bulunur", () => {
+  test("Expo is checked before RN CLI — an Expo project has a Podfile too", () => {
     write("package.json", `{"dependencies":{"expo":"~54.0.0","react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
     assert.equal(detectProjectKind(projectPath), "expo");
   });
 
-  test("Podfile'sız react-native tanınmaz — prebuild edilmemiş olabilir", () => {
+  test("react-native without a Podfile is not recognised — it may not be prebuilt yet", () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     assert.equal(detectProjectKind(projectPath), undefined);
   });
 
-  test("mobil olmayan klasör tanınmaz", () => {
+  test("a non-mobile folder is not recognised", () => {
     write("package.json", `{"dependencies":{"express":"4.0.0"}}`);
     assert.equal(detectProjectKind(projectPath), undefined);
   });
 
-  test("boş klasör ve bozuk package.json çökmez", () => {
+  test("an empty folder and a broken package.json do not crash it", () => {
     assert.equal(detectProjectKind(projectPath), undefined);
     write("package.json", "bu json değil");
     assert.equal(detectProjectKind(projectPath), undefined);
   });
 
-  test("sonuç önbelleğe alınmaz — bağımlılık sonradan eklenebilir", () => {
+  test("the result is not cached — a dependency can be added later", () => {
     write("package.json", `{"dependencies":{}}`);
     assert.equal(detectProjectKind(projectPath), undefined);
 
@@ -95,14 +95,14 @@ describe("detectProjectKind", () => {
 });
 
 describe("getAdapter", () => {
-  test("Expo projesinde expo adapter'ı döner", async () => {
+  test("returns the expo adapter for an Expo project", async () => {
     write("package.json", `{"dependencies":{"expo":"~54.0.0"}}`);
     const adapter = await getAdapter(projectPath);
     assert.equal(adapter.kind, "expo");
     assert.equal(adapter.supports("qabuild"), true);
   });
 
-  test("RN CLI projesinde rn adapter'ı döner ve /qabuild kapalıdır", async () => {
+  test("returns the rn adapter for an RN CLI project, with /qabuild disabled", async () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
     const adapter = await getAdapter(projectPath);
@@ -113,7 +113,7 @@ describe("getAdapter", () => {
     assert.equal(adapter.supports("localbuild"), true);
   });
 
-  test("ensureSupported desteklenmeyen komutu proje tipiyle birlikte reddeder", async () => {
+  test("ensureSupported rejects an unsupported command and names the project type", async () => {
     write("package.json", `{"dependencies":{"react-native":"0.76.0"}}`);
     write("ios/Podfile", "platform :ios");
     await assert.rejects(
@@ -122,7 +122,7 @@ describe("getAdapter", () => {
     );
   });
 
-  test("tanınmayan klasörde iOS komutlarının kapalı olduğunu söyler", async () => {
+  test("says iOS commands are unavailable in an unrecognised folder", async () => {
     await assert.rejects(getAdapter(projectPath), /tanınan bir mobil proje değil/);
   });
 });

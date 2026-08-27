@@ -27,7 +27,7 @@ after(async () => {
 });
 
 describe("probeMetro", () => {
-  test("Metro çalışıyorsa proje kökünü döner", async () => {
+  test("returns the project root when Metro is running", async () => {
     respond = (res) => {
       res.setHeader("X-React-Native-Project-Root", "/Users/x/proje");
       res.end("packager-status:running");
@@ -38,17 +38,17 @@ describe("probeMetro", () => {
     });
   });
 
-  test("başlık yoksa boş dizge — devralma kontrolü yine de yapılabilsin", async () => {
+  test("empty string without the header — so the takeover check can still run", async () => {
     respond = (res) => res.end("packager-status:running");
     assert.deepEqual(await probeMetro(port), { state: "running", projectRoot: "" });
   });
 
-  test("portu tutan başka bir sunucu 'port-taken'", async () => {
+  test("another server holding the port yields 'port-taken'", async () => {
     respond = (res) => res.end("<html>başka bir servis</html>");
     assert.deepEqual(await probeMetro(port), { state: "port-taken" });
   });
 
-  test("hiçbir şey dinlemiyorsa 'down'", async () => {
+  test("'down' when nothing is listening", async () => {
     // Kapalı olduğu bilinen bir port: dinleyip hemen kapatıyoruz.
     const idle = http.createServer();
     await new Promise<void>((resolve) => idle.listen(0, "127.0.0.1", resolve));

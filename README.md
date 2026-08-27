@@ -240,9 +240,12 @@ If your phone is on the same Wi-Fi as the Mac, none of this matters.
 
 Deliberately **not** supported:
 
-- **Android.** The whole build and distribution layer is iOS-specific.
 - **Multi-user.** One owner, one machine, by design. Run your own.
 - **Tailscale on the phone.** Not required and not planned.
+
+**Android** is not supported today — the build and distribution layer is
+iOS-specific — but it is not ruled out. If you want to build it, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
@@ -252,6 +255,11 @@ Deliberately **not** supported:
   expose it.
 - `.env` and your `.p8` key are secrets. `.env` is gitignored; keep the key
   outside the repo.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) — scope, the commands CI runs, and the
+one testing convention that is not obvious from the code.
 
 ## License
 

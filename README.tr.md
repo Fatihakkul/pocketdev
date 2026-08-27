@@ -245,9 +245,11 @@ Telefonun Mac ile aynı Wi-Fi'daysa bunların hiçbiri gerekmiyor.
 
 Bilerek **desteklenmeyenler**:
 
-- **Android.** Tüm build ve dağıtım katmanı iOS'a özgü.
 - **Çok kullanıcı.** Tek sahip, tek makine — tasarım gereği. Kendinkini çalıştır.
 - **Telefona Tailscale kurmak.** Gerekmiyor, planlanmıyor.
+
+**Android** bugün desteklenmiyor — build ve dağıtım katmanı iOS'a özgü — ama
+kapalı da değil. Geliştirmek istersen [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Güvenlik
 
@@ -256,6 +258,11 @@ Bilerek **desteklenmeyenler**:
 - Web paneli `127.0.0.1`'e bağlı ve **kimlik doğrulaması yok** — dışarı açma.
 - `.env` ve `.p8` anahtarın birer sırdır. `.env` gitignore'da; anahtarı repo
   dışında tut.
+
+## Katkı
+
+[CONTRIBUTING.md](CONTRIBUTING.md) (İngilizce) — kapsam, CI'ın çalıştırdığı
+komutlar ve kodu okuyarak anlaşılmayan tek test konvansiyonu.
 
 ## Lisans
 

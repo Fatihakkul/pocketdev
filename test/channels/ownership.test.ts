@@ -10,22 +10,22 @@ import { decideAuth } from "../../src/channels/ownership.js";
 
 const CODE = "123456";
 
-describe("decideAuth — sahip belliyken", () => {
-  test("sahibin mesajı geçiyor", () => {
+describe("decideAuth — with a known owner", () => {
+  test("the owner's message passes", () => {
     assert.deepEqual(
       decideAuth({ userId: 7, ownerId: 7, text: "merhaba", claimCode: CODE }),
       { kind: "allow" }
     );
   });
 
-  test("yabancı sessizce yok sayılıyor", () => {
+  test("a stranger is ignored silently", () => {
     assert.deepEqual(
       decideAuth({ userId: 8, ownerId: 7, text: "merhaba", claimCode: CODE }),
       { kind: "ignore" }
     );
   });
 
-  test("yabancının doğru kodu bile sahipliği devralamıyor", () => {
+  test("even a correct code from a stranger cannot take over ownership", () => {
     // Sahip belliyken /claim kapalı olmak zorunda: aksi halde kodu ele geçiren
     // biri çalışan bir kurulumu devralabilirdi.
     assert.deepEqual(
@@ -35,15 +35,15 @@ describe("decideAuth — sahip belliyken", () => {
   });
 });
 
-describe("decideAuth — sahiplenilmemişken", () => {
-  test("doğru kod sahipliği veriyor", () => {
+describe("decideAuth — before anyone has claimed it", () => {
+  test("the correct code grants ownership", () => {
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: `/claim ${CODE}`, claimCode: CODE }),
       { kind: "claim-ok", userId: 9 }
     );
   });
 
-  test("bot adıyla yazılmış komut da çalışıyor", () => {
+  test("the command also works when written with the bot name", () => {
     // Gruplarda ve bazı istemcilerde Telegram komutu `/claim@botadi` diye gönderiyor.
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: `/claim@benimbot ${CODE}`, claimCode: CODE }),
@@ -51,28 +51,28 @@ describe("decideAuth — sahiplenilmemişken", () => {
     );
   });
 
-  test("baştaki ve sondaki boşluk sorun değil", () => {
+  test("leading and trailing whitespace is not a problem", () => {
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: `  /claim ${CODE}  `, claimCode: CODE }),
       { kind: "claim-ok", userId: 9 }
     );
   });
 
-  test("yanlış kod reddediliyor", () => {
+  test("a wrong code is rejected", () => {
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: "/claim 000000", claimCode: CODE }),
       { kind: "claim-bad" }
     );
   });
 
-  test("kodsuz /claim reddediliyor", () => {
+  test("/claim without a code is rejected", () => {
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: "/claim", claimCode: CODE }),
       { kind: "claim-bad" }
     );
   });
 
-  test("/claim dışındaki hiçbir mesaj işlenmiyor", () => {
+  test("no message other than /claim is processed", () => {
     // Sahiplenilmemiş bot, kodu bilmeyen birine hiçbir komutu çalıştırmamalı.
     for (const text of ["merhaba", "/help", "/otabuild", "/claimx 123456"]) {
       assert.deepEqual(
@@ -83,14 +83,14 @@ describe("decideAuth — sahiplenilmemişken", () => {
     }
   });
 
-  test("metinsiz mesaj (fotoğraf, sticker) yok sayılıyor", () => {
+  test("a message without text (photo, sticker) is ignored", () => {
     assert.deepEqual(
       decideAuth({ userId: 9, ownerId: undefined, text: undefined, claimCode: CODE }),
       { kind: "ignore" }
     );
   });
 
-  test("kullanıcı kimliği yoksa yok sayılıyor", () => {
+  test("a message without a user id is ignored", () => {
     assert.deepEqual(
       decideAuth({ userId: undefined, ownerId: undefined, text: `/claim ${CODE}`, claimCode: CODE }),
       { kind: "ignore" }

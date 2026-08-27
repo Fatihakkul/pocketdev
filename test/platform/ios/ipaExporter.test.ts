@@ -36,29 +36,29 @@ const AUTOMATIC: Signing = { mode: "automatic", teamId: "ABCDE12345", credential
 const plist = buildExportOptionsPlist("https://mac.tailnet.ts.net", "com.example.app", MANUAL);
 
 describe("buildExportOptionsPlist", () => {
-  test("export yöntemi release-testing", () => {
+  test("the export method is release-testing", () => {
     assert.match(plist, /<key>method<\/key>\s*<string>release-testing<\/string>/);
     assert.doesNotMatch(plist, /ad-hoc/);
   });
 
-  test("imzalama sertifikası iOS Distribution", () => {
+  test("the signing certificate is iOS Distribution", () => {
     assert.match(plist, /<key>signingCertificate<\/key>\s*<string>iOS Distribution<\/string>/);
     assert.doesNotMatch(plist, /Apple Distribution/);
   });
 
-  test("manuel imzalama ve takım kimliği yazılır", () => {
+  test("manual signing and the team id are written", () => {
     assert.match(plist, /<key>signingStyle<\/key>\s*<string>manual<\/string>/);
     assert.match(plist, /<key>teamID<\/key>\s*<string>ABCDE12345<\/string>/);
   });
 
-  test("profil bundle id ile eşleştirilir", () => {
+  test("the profile is matched by bundle id", () => {
     assert.match(
       plist,
       /<key>provisioningProfiles<\/key>\s*<dict>\s*<key>com\.example\.app<\/key>\s*<string>Ad Hoc Profile<\/string>/
     );
   });
 
-  test("manifest URL'leri tünel adresine gömülür", () => {
+  test("manifest URLs embed the tunnel address", () => {
     // Host export anında plist'e sabitleniyor; bu yüzden akış archive → tunnel →
     // export sırasında ilerlemek zorunda.
     assert.match(plist, /<string>https:\/\/mac\.tailnet\.ts\.net\/app\.ipa<\/string>/);
@@ -66,7 +66,7 @@ describe("buildExportOptionsPlist", () => {
     assert.match(plist, /<string>https:\/\/mac\.tailnet\.ts\.net\/icon-512\.png<\/string>/);
   });
 
-  test("geçerli bir plist iskeleti üretir", () => {
+  test("produces a valid plist skeleton", () => {
     assert.match(plist, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
     assert.match(plist, /<!DOCTYPE plist PUBLIC/);
     assert.match(plist, /<\/plist>\s*$/);
@@ -78,20 +78,20 @@ describe("buildExportOptionsPlist", () => {
  * profili Apple'a ürettirmek. Profil bir kez oluştuktan sonra diske kurulduğu
  * için sonraki build'ler manuel yola dönüyor.
  */
-describe("buildExportOptionsPlist — otomatik imzalama", () => {
+describe("buildExportOptionsPlist — automatic signing", () => {
   const auto = buildExportOptionsPlist("https://mac.tailnet.ts.net", "com.example.app", AUTOMATIC);
 
-  test("imzalama stili automatic", () => {
+  test("the signing style is automatic", () => {
     assert.match(auto, /<key>signingStyle<\/key>\s*<string>automatic<\/string>/);
   });
 
-  test("profil ve sertifika seçimi Xcode'a bırakılıyor", () => {
+  test("profile and certificate selection is left to Xcode", () => {
     // İkisi de henüz var olmayabilir; sabitlemek bootstrap'ın amacını baltalar.
     assert.doesNotMatch(auto, /provisioningProfiles/);
     assert.doesNotMatch(auto, /signingCertificate/);
   });
 
-  test("export yöntemi ve takım kimliği değişmiyor", () => {
+  test("the export method and team id stay the same", () => {
     assert.match(auto, /<key>method<\/key>\s*<string>release-testing<\/string>/);
     assert.match(auto, /<key>teamID<\/key>\s*<string>ABCDE12345<\/string>/);
   });
@@ -107,45 +107,45 @@ describe("selectProfile", () => {
     expiresAt,
   });
 
-  test("aday yoksa undefined", () => {
+  test("undefined when there is no candidate", () => {
     assert.equal(selectProfile([], now), undefined);
   });
 
-  test("süresi dolmuş profil seçilmiyor", () => {
+  test("an expired profile is not selected", () => {
     assert.equal(selectProfile([profile("eski", at("2026-01-01T00:00:00Z"))], now), undefined);
   });
 
-  test("birden fazla geçerli aday varsa en ileri tarihli seçiliyor", () => {
+  test("with several valid candidates the latest-expiring one wins", () => {
     // Gerçek durum: elle üretilmiş profille Xcode'un ürettiği yan yana duruyor.
     // Dizin sırası keyfi olduğu için "ilkini al" süresi dolmuşu seçebiliyordu.
     const selected = selectProfile(
       [
-        profile("yakında dolacak", at("2026-09-01T00:00:00Z")),
-        profile("taze", at("2027-07-16T00:00:00Z")),
+        profile("expiring soon", at("2026-09-01T00:00:00Z")),
+        profile("fresh", at("2027-07-16T00:00:00Z")),
       ],
       now
     );
-    assert.equal(selected?.name, "taze");
+    assert.equal(selected?.name, "fresh");
   });
 
-  test("süresi dolmuşlar elenip geçerli olan seçiliyor", () => {
+  test("expired ones are filtered out and the valid one is selected", () => {
     const selected = selectProfile(
-      [profile("dolmuş", at("2025-01-01T00:00:00Z")), profile("geçerli", at("2027-01-01T00:00:00Z"))],
+      [profile("expired", at("2025-01-01T00:00:00Z")), profile("valid", at("2027-01-01T00:00:00Z"))],
       now
     );
-    assert.equal(selected?.name, "geçerli");
+    assert.equal(selected?.name, "valid");
   });
 
-  test("tarihi okunamayan profil elenmiyor", () => {
+  test("a profile with an unreadable date is not filtered out", () => {
     // Bilinmeyen sorun sayılmaz: tarih ayrıştırılamadıysa profili kullanılamaz
     // ilan etmek, çalışan bir kurulumu bozmak olurdu.
     assert.equal(selectProfile([profile("tarihsiz")], now)?.name, "tarihsiz");
   });
 
-  test("tarihli geçerli profil, tarihsize tercih ediliyor", () => {
+  test("a dated valid profile is preferred over an undated one", () => {
     // Tarihsiz olan sonsuz sayılırsa yanlış olurdu; ama burada tarihsiz aday
     // bilinmeyen, bilinen geçerli olan daha güvenli.
-    const selected = selectProfile([profile("tarihsiz"), profile("geçerli", at("2027-01-01T00:00:00Z"))], now);
+    const selected = selectProfile([profile("tarihsiz"), profile("valid", at("2027-01-01T00:00:00Z"))], now);
     assert.ok(selected);
   });
 });
@@ -153,12 +153,12 @@ describe("selectProfile", () => {
 describe("authenticationArgs", () => {
   const args = authenticationArgs(CREDENTIALS);
 
-  test("profil üretimi ve cihaz kaydı açık", () => {
+  test("profile generation and device registration are enabled", () => {
     assert.ok(args.includes("-allowProvisioningUpdates"));
     assert.ok(args.includes("-allowProvisioningDeviceRegistration"));
   });
 
-  test("üç kimlik bayrağı da değeriyle birlikte geçiyor", () => {
+  test("all three credential flags are passed with their values", () => {
     // Bayrak adları sessizce yanlış yazılabilecek türden; `man xcodebuild`
     // (Xcode 26.6) bu üçünü birlikte zorunlu kılıyor.
     for (const [flag, value] of [
@@ -174,7 +174,7 @@ describe("authenticationArgs", () => {
 });
 
 describe("archiveSigningArgs", () => {
-  test("manuel modda profil ve kimlik sabitleniyor", () => {
+  test("manual mode pins the profile and the identity", () => {
     const args = archiveSigningArgs(MANUAL, "DEADBEEF");
     assert.ok(args.includes("CODE_SIGN_STYLE=Manual"));
     assert.ok(args.includes(`PROVISIONING_PROFILE_SPECIFIER=${PROFILE.uuid}`));
@@ -182,13 +182,13 @@ describe("archiveSigningArgs", () => {
     assert.ok(args.includes(`DEVELOPMENT_TEAM=${PROFILE.teamId}`));
   });
 
-  test("manuel modda portalla konuşulmuyor", () => {
+  test("manual mode does not talk to the portal", () => {
     // Çalışan kurulumun davranışı değişmemeli: profil zaten varken Apple'a
     // bağlanmanın ne gereği var ne de faydası.
     assert.ok(!archiveSigningArgs(MANUAL, "DEADBEEF").includes("-allowProvisioningUpdates"));
   });
 
-  test("otomatik modda takım verilip kimlik seçimi Xcode'a bırakılıyor", () => {
+  test("automatic mode passes the team and leaves identity selection to Xcode", () => {
     const args = archiveSigningArgs(AUTOMATIC, undefined);
     assert.ok(args.includes("CODE_SIGN_STYLE=Automatic"));
     assert.ok(args.includes("DEVELOPMENT_TEAM=ABCDE12345"));

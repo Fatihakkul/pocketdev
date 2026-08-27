@@ -28,47 +28,47 @@ const REAL_CAPS = {
 };
 
 describe("describeTailscaleReadiness", () => {
-  test("çalışan ve Funnel izinli makinede sorun bildirmiyor", () => {
+  test("reports no problem on a running, Funnel-enabled machine", () => {
     const status = running({ DNSName: "makine.tailnet.ts.net.", CapMap: REAL_CAPS });
     assert.equal(describeTailscaleReadiness(status), undefined);
   });
 
-  test("oturum açık değilse `tailscale up` öneriyor", () => {
+  test("suggests `tailscale up` when not logged in", () => {
     const message = describeTailscaleReadiness({ BackendState: "NeedsLogin" });
     assert.match(message ?? "", /tailscale up/);
     // Durumu mesaja koymak şart: "Stopped" ile "NeedsLogin" farklı çözümler ister.
     assert.match(message ?? "", /NeedsLogin/);
   });
 
-  test("BackendState hiç yoksa da sorun bildiriyor", () => {
+  test("reports a problem when BackendState is missing entirely", () => {
     assert.notEqual(describeTailscaleReadiness({}), undefined);
   });
 
-  test("MagicDNS kapalıysa makine adının alınamadığını söylüyor", () => {
+  test("says the machine name is unavailable when MagicDNS is off", () => {
     const message = describeTailscaleReadiness(running({ CapMap: REAL_CAPS }));
     assert.match(message ?? "", /MagicDNS/);
   });
 
-  test("HTTPS sertifikaları kapalıysa admin konsolu yolunu veriyor", () => {
+  test("points to the admin console when HTTPS certificates are off", () => {
     const { https: _omitted, ...withoutHttps } = REAL_CAPS;
     const message = describeTailscaleReadiness(running({ DNSName: "m.ts.net.", CapMap: withoutHttps }));
     assert.match(message ?? "", /HTTPS Certificates/);
   });
 
-  test("Funnel izni yoksa nodeAttrs'ı işaret ediyor", () => {
+  test("points at nodeAttrs when Funnel permission is missing", () => {
     const { funnel: _omitted, ...withoutFunnel } = REAL_CAPS;
     const message = describeTailscaleReadiness(running({ DNSName: "m.ts.net.", CapMap: withoutFunnel }));
     assert.match(message ?? "", /nodeAttrs/);
   });
 
-  test("HTTPS eksikse Funnel'dan ÖNCE bildiriliyor", () => {
+  test("a missing HTTPS setup is reported BEFORE Funnel", () => {
     // İkisi de eksikken sıra önemli: HTTPS sertifikası açılmadan Funnel izni tek
     // başına işe yaramıyor, yani kullanıcıya önce onu söylemek gerekiyor.
     const message = describeTailscaleReadiness(running({ DNSName: "m.ts.net.", CapMap: { "cap/x": null } }));
     assert.match(message ?? "", /HTTPS Certificates/);
   });
 
-  test("CapMap yoksa yetenek kontrolü atlanıyor", () => {
+  test("the capability check is skipped when CapMap is absent", () => {
     // Eski tailscale sürümleri ya da alan adı değişikliği: bilinmeyen sorun
     // sayılırsa çalışan kurulum reddedilir.
     assert.equal(describeTailscaleReadiness(running({ DNSName: "m.ts.net." })), undefined);

@@ -58,14 +58,14 @@ const SAMPLE = JSON.stringify([
 ]);
 
 describe("parseDeviceList", () => {
-  test("yalnızca kullanılabilir fiziksel iPhone/iPad'ler", () => {
+  test("only available physical iPhones and iPads", () => {
     assert.deepEqual(
       parseDeviceList(SAMPLE).available.map((d) => d.name),
       ["Ornek iPhone"]
     );
   });
 
-  test("isim, sürüm ve UDID doğru ayrışır; build numarası atılır", () => {
+  test("name, version and UDID parse correctly; the build number is dropped", () => {
     const [iphone] = parseDeviceList(SAMPLE).available;
     assert.deepEqual(iphone, {
       name: "Ornek iPhone",
@@ -74,18 +74,18 @@ describe("parseDeviceList", () => {
     });
   });
 
-  test("UDID klasik donanım biçiminde — Expo ve RN CLI ancak bunu eşleştiriyor", () => {
+  test("the UDID is in the classic hardware form — the only one Expo and RN CLI match", () => {
     const [iphone] = parseDeviceList(SAMPLE).available;
     assert.match(iphone!.udid, /^000080\d\d-/);
   });
 
-  test("Mac ve simülatörler elenir", () => {
+  test("Macs and simulators are filtered out", () => {
     const { available } = parseDeviceList(SAMPLE);
     assert.equal(available.some((d) => d.name.includes("Mac")), false);
     assert.equal(available.some((d) => d.name.startsWith("iPhone 17")), false);
   });
 
-  test("kullanılamayan cihaz sebebiyle birlikte ayrı listede", () => {
+  test("an unavailable device goes in a separate list with its reason", () => {
     const { unavailable } = parseDeviceList(SAMPLE);
     assert.deepEqual(unavailable, [
       {
@@ -97,7 +97,7 @@ describe("parseDeviceList", () => {
     ]);
   });
 
-  test("sebep bildirilmemişse yer tutucu", () => {
+  test("a placeholder when no reason is reported", () => {
     const stdout = JSON.stringify([
       {
         simulator: false,
@@ -110,7 +110,7 @@ describe("parseDeviceList", () => {
     assert.equal(parseDeviceList(stdout).unavailable[0]?.reason, "sebep bildirilmedi");
   });
 
-  test("beklenmedik çıktı çökmez", () => {
+  test("unexpected output does not crash it", () => {
     const empty: DeviceScan = { available: [], unavailable: [] };
     assert.deepEqual(parseDeviceList(""), empty);
     assert.deepEqual(parseDeviceList("xcrun: error: unable to find utility"), empty);
@@ -129,15 +129,15 @@ const scan = (available: AppleDevice[], unavailable: DeviceScan["unavailable"] =
 });
 
 describe("resolveDevice", () => {
-  test("tek cihaz varsa arama gerekmez", () => {
+  test("no search needed when there is a single device", () => {
     assert.equal(resolveDevice(scan([IPHONE])).udid, IPHONE.udid);
   });
 
-  test("cihaz yoksa yol gösteren hata atar", () => {
+  test("throws an actionable error when there is no device", () => {
     assert.throws(() => resolveDevice(scan([])), /Bağlı iOS cihazı bulunamadı/);
   });
 
-  test("kullanılamayan cihaz varsa Xcode'un gerekçesini gösterir", () => {
+  test("shows Xcode's reason when a device is unavailable", () => {
     assert.throws(
       () => resolveDevice(scan([], [{ ...IPHONE, reason: "iPhone is locked." }])),
       (error: Error) => {
@@ -148,7 +148,7 @@ describe("resolveDevice", () => {
     );
   });
 
-  test("birden fazla cihaz varsa seçim ister ve hepsini listeler", () => {
+  test("asks for a choice and lists them all when there are several devices", () => {
     assert.throws(() => resolveDevice(scan([IPHONE, IPAD])), (error: Error) => {
       assert.match(error.message, /Birden fazla cihaz bağlı/);
       assert.match(error.message, /Ornek iPhone \(18\.6\.2\)/);
@@ -157,12 +157,12 @@ describe("resolveDevice", () => {
     });
   });
 
-  test("isimle eşleşir, büyük/küçük harf duyarsız", () => {
+  test("matches by name, case-insensitively", () => {
     assert.equal(resolveDevice(scan([IPHONE, IPAD]), "IPAD").udid, IPAD.udid);
     assert.equal(resolveDevice(scan([IPHONE, IPAD]), "iPad").udid, IPAD.udid);
   });
 
-  test("BİLİNEN SINIR: Türkçe İ ile yazılan isim eşleşmez", () => {
+  test("KNOWN LIMITATION: a name written with the Turkish dotted İ does not match", () => {
     // "İ".toLowerCase() birleşik noktalı "i̇" üretiyor, düz "i" değil; bu yüzden
     // kullanıcı cihaz adını Türkçe büyük harfle yazarsa eşleşme kaçıyor.
     // Davranış bilerek değiştirilmedi: UDID ve olduğu gibi yazılan isim çalışıyor.
@@ -172,11 +172,11 @@ describe("resolveDevice", () => {
     });
   });
 
-  test("UDID ile eşleşir", () => {
+  test("matches by UDID", () => {
     assert.equal(resolveDevice(scan([IPHONE, IPAD]), "00008103-bbb").udid, IPAD.udid);
   });
 
-  test("eşleşme yoksa bağlı cihazları hatada gösterir", () => {
+  test("lists the connected devices in the error when nothing matches", () => {
     assert.throws(() => resolveDevice(scan([IPHONE]), "olmayan"), (error: Error) => {
       assert.ok(error.message.includes(m().runtime.noMatchingDevice("olmayan", "").split("\n")[0]!));
       assert.match(error.message, /Ornek iPhone/);
